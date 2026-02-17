@@ -171,12 +171,14 @@ async function executeTask(task: Task) {
       // 保存账号
       try {
         // 准备基本账号数据
-        const baseAccountData = {
+        const baseAccountData: Account = {
           id: uuidv4(),
           email: task.email,
           password: task.password,
+          nickname: undefined,
           idp: 'BuilderId' as IdpType,
-          status: 'active' as AccountStatus,
+          userId: undefined,
+          visitorId: undefined,
           credentials: {
             accessToken: result.ssoToken || '',
             refreshToken: task.auth_code,
@@ -193,8 +195,18 @@ async function executeTask(task: Task) {
             percentUsed: 0,
             lastUpdated: Date.now()
           },
-          createdAt: Date.now()
-        } as Account
+          groupId: undefined,
+          tags: undefined,
+          status: 'active' as AccountStatus,
+          lastError: undefined,
+          consecutiveFailures: 0,
+          isActive: true,
+          deviceId: undefined,
+          assignedAt: undefined,
+          createdAt: Date.now(),
+          lastUsedAt: undefined,
+          lastCheckedAt: undefined
+        }
         
         // 尝试同步完整账号信息（用户信息、订阅信息、使用量等）
         log('正在获取账号详细信息...')

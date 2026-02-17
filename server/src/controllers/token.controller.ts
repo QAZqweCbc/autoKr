@@ -67,7 +67,8 @@ export async function submitToken(req: Request, res: Response) {
         password: '', // SSO 导入不需要密码
         nickname: email.split('@')[0],
         idp: 'BuilderId',
-        userId: '',
+        userId: undefined,
+        visitorId: undefined,
         credentials: {
           accessToken: ssoResult.accessToken || '',
           refreshToken: ssoResult.refreshToken || '',
@@ -86,8 +87,17 @@ export async function submitToken(req: Request, res: Response) {
           percentUsed: 0,
           lastUpdated: Date.now()
         },
+        groupId: undefined,
+        tags: undefined,
         status: 'active',
-        createdAt: Date.now()
+        lastError: undefined,
+        consecutiveFailures: 0,
+        isActive: true,  // 明确设置为 true
+        deviceId: undefined,
+        assignedAt: undefined,
+        createdAt: Date.now(),
+        lastUsedAt: undefined,
+        lastCheckedAt: undefined
       }
 
       await AccountDB.create(newAccount)

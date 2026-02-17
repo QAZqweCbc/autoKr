@@ -78,7 +78,7 @@ export function accountToFlat(account: Account): AccountFlatDB {
     status: account.status ?? null,
     last_error: account.lastError ?? null,
     consecutive_failures: account.consecutiveFailures ?? 0,
-    is_active: account.isActive ?? null,
+    is_active: account.isActive ?? true,  // 默认为 true
     device_id: account.deviceId ?? null,
     assigned_at: account.assignedAt ?? null,
     created_at: account.createdAt,
