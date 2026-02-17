@@ -8,6 +8,8 @@
     "dev:auth": "ts-node src/auth-service/index.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:auth\"",
     "build": "tsc",
+    "build:frontend": "cd frontend && npm run build",
+    "build:all": "npm run build && npm run build:frontend",
     "start": "node dist/index.js",
     "start:auth": "node dist/auth-service/index.js",
     "test": "jest",

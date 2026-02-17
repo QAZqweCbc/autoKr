@@ -66,7 +66,7 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import axios from 'axios'
+import api from '../api/axios'
 import '../styles/admin-login-view.css'
 
 const router = useRouter()
@@ -98,7 +98,7 @@ async function handleLogin() {
     loading.value = true
     loginStatus.value = null
 
-    const { data } = await axios.post('http://localhost:3000/api/admin/login', {
+    const { data } = await api.post('/admin/login', {
       email: form.email,
       password: form.password
     })

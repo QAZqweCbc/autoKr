@@ -26,6 +26,23 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'auth-service', port: PORT })
 })
 
+// 根路径
+app.get('/', (_req, res) => {
+  res.json({ 
+    service: 'Kiro Auth Service',
+    version: '1.0.0',
+    endpoints: [
+      'POST /api/auth/send-code',
+      'POST /api/auth/register',
+      'POST /api/auth/login',
+      'POST /api/tokens/request',
+      'GET  /api/tokens/my-requests',
+      'GET  /api/tokens/my-tokens',
+      'POST /api/tokens/refresh/:id'
+    ]
+  })
+})
+
 // API路由
 app.use('/api/auth', authRoutes)
 app.use('/api/tokens', tokenRoutes)
