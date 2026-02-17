@@ -200,7 +200,14 @@ async function executeTask(task: Task) {
         log('正在获取账号详细信息...')
         console.log(`[${task.email}] 调用 Kiro API 同步账号信息...`)
         
-        const syncResult = await syncAccountUsage(result.ssoToken || '', 'BuilderId')
+        // 新注册账号可能需要等待 token 生效，添加重试逻辑
+        let syncResult = await syncAccountUsage(result.ssoToken || '', 'BuilderId')
+        
+        if (!syncResult.success && syncResult.error?.includes('401')) {
+          log('⏳ Token 尚未生效，等待 3 秒后重试...')
+          await new Promise(resolve => setTimeout(resolve, 3000))
+          syncResult = await syncAccountUsage(result.ssoToken || '', 'BuilderId')
+        }
         
         let accountData = baseAccountData
         if (syncResult.success && syncResult.data) {

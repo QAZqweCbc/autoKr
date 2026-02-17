@@ -13,8 +13,9 @@ data/
 *.db-journal
 
 # Database config (contains sensitive info)
-config/database.config.json
+# config/database.config.json  # 如果需要提交配置，注释此行
 config/*.json
+!config/database.config.json  # 允许提交数据库配置
 
 # Logs
 *.log

@@ -200,60 +200,60 @@ export function importDTOToAccount(dto: any, password: string = ''): Account {
     id: acc.id || acc.email,
     email: acc.email,
     password: password,
-    nickname: acc.nickname,
+    nickname: acc.nickname || undefined,
     idp: (acc.idp as any) || 'BuilderId',
-    userId: acc.userId,
+    userId: acc.userId || undefined,
     visitorId: undefined,
     
     credentials: {
-      accessToken: acc.credentials.accessToken,
-      csrfToken: acc.credentials.csrfToken,
-      refreshToken: acc.credentials.refreshToken,
-      clientId: acc.credentials.clientId,
-      clientSecret: acc.credentials.clientSecret,
+      accessToken: acc.credentials.accessToken || '',
+      csrfToken: acc.credentials.csrfToken || undefined,
+      refreshToken: acc.credentials.refreshToken || undefined,
+      clientId: acc.credentials.clientId || undefined,
+      clientSecret: acc.credentials.clientSecret || undefined,
       region: acc.credentials.region || 'us-east-1',
-      expiresAt: acc.credentials.expiresAt,
-      authMethod: acc.credentials.authMethod as any,
-      provider: acc.credentials.provider as any
+      expiresAt: acc.credentials.expiresAt || undefined,
+      authMethod: acc.credentials.authMethod as any || undefined,
+      provider: acc.credentials.provider as any || undefined
     },
     
     subscription: {
-      type: acc.subscription.type,
-      title: acc.subscription.title,
-      rawType: acc.subscription.rawType,
-      expiresAt: acc.subscription.expiresAt,
-      daysRemaining: acc.subscription.daysRemaining,
-      upgradeCapability: acc.subscription.upgradeCapability,
-      overageCapability: acc.subscription.overageCapability,
-      managementTarget: acc.subscription.managementTarget
+      type: acc.subscription?.type || 'Free',
+      title: acc.subscription?.title || undefined,
+      rawType: acc.subscription?.rawType || undefined,
+      expiresAt: acc.subscription?.expiresAt || undefined,
+      daysRemaining: acc.subscription?.daysRemaining ?? undefined,
+      upgradeCapability: acc.subscription?.upgradeCapability || undefined,
+      overageCapability: acc.subscription?.overageCapability || undefined,
+      managementTarget: acc.subscription?.managementTarget || undefined
     },
     
     usage: {
-      current: acc.usage.current,
-      limit: acc.usage.limit,
-      percentUsed: acc.usage.percentUsed,
-      lastUpdated: acc.usage.lastUpdated || Date.now(),
-      baseLimit: acc.usage.baseLimit,
-      baseCurrent: acc.usage.baseCurrent,
-      freeTrialLimit: acc.usage.freeTrialLimit,
-      freeTrialCurrent: acc.usage.freeTrialCurrent,
-      freeTrialExpiry: acc.usage.freeTrialExpiry,
-      bonuses: acc.usage.bonuses,
-      nextResetDate: acc.usage.nextResetDate,
-      resourceDetail: acc.usage.resourceDetail
+      current: acc.usage?.current ?? 0,
+      limit: acc.usage?.limit ?? 0,
+      percentUsed: acc.usage?.percentUsed ?? 0,
+      lastUpdated: acc.usage?.lastUpdated || Date.now(),
+      baseLimit: acc.usage?.baseLimit ?? undefined,
+      baseCurrent: acc.usage?.baseCurrent ?? undefined,
+      freeTrialLimit: acc.usage?.freeTrialLimit ?? undefined,
+      freeTrialCurrent: acc.usage?.freeTrialCurrent ?? undefined,
+      freeTrialExpiry: acc.usage?.freeTrialExpiry || undefined,
+      bonuses: acc.usage?.bonuses || undefined,
+      nextResetDate: acc.usage?.nextResetDate || undefined,
+      resourceDetail: acc.usage?.resourceDetail || undefined
     },
     
     groupId: undefined,
-    tags: acc.tags,
+    tags: acc.tags || undefined,
     status: (acc.status as any) || 'active',
-    lastError: acc.lastError,
+    lastError: acc.lastError || undefined,
     consecutiveFailures: acc.consecutiveFailures ?? 0,
-    isActive: acc.isActive,
+    isActive: acc.isActive ?? undefined,
     deviceId: undefined,
     assignedAt: undefined,
     createdAt: acc.createdAt || Date.now(),
-    lastUsedAt: acc.lastUsedAt,
-    lastCheckedAt: acc.lastCheckedAt
+    lastUsedAt: acc.lastUsedAt || undefined,
+    lastCheckedAt: acc.lastCheckedAt || undefined
   }
 }
 

@@ -262,16 +262,21 @@ export const AccountDB = {
     const now = Date.now()
     const fullAccount = { ...account, created_at: now } as Account
     
+    // 清理 undefined 值，避免 JSON 序列化问题
+    const cleanAccount = JSON.parse(JSON.stringify(fullAccount, (key, value) => 
+      value === undefined ? null : value
+    ))
+    
     // 检查是否已存在
-    const existing = dataStore.accounts.find(a => a.email === fullAccount.email)
+    const existing = dataStore.accounts.find(a => a.email === cleanAccount.email)
     if (existing) {
-      Object.assign(existing, fullAccount)
+      Object.assign(existing, cleanAccount)
     } else {
-      dataStore.accounts.push(fullAccount)
+      dataStore.accounts.push(cleanAccount)
     }
     
     saveData()
-    return fullAccount
+    return cleanAccount
   },
   
   getById(id: string): Account | undefined {
