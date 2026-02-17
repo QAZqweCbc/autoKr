@@ -15,6 +15,30 @@ export const MySQLAccountDBNew = {
     try {
       const flat = accountToFlat(account)
       
+      // 确保所有值都不是 undefined
+      const values = [
+        flat.id, flat.email, flat.password,
+        flat.access_token, flat.csrf_token, flat.refresh_token, flat.x_amz_sso_authn, flat.client_id, flat.client_secret, flat.region, flat.expires_at, flat.auth_method, flat.provider,
+        flat.subscription_type, flat.subscription_title, flat.subscription_raw_type, flat.subscription_expires_at, flat.subscription_days_remaining,
+        flat.upgrade_capability, flat.overage_capability, flat.management_target,
+        flat.usage_current, flat.usage_limit, flat.usage_percent_used, flat.usage_last_updated,
+        flat.base_limit, flat.base_current, flat.free_trial_limit, flat.free_trial_current, flat.free_trial_expiry,
+        flat.usage_bonuses, flat.next_reset_date,
+        flat.resource_type, flat.resource_display_name, flat.resource_display_name_plural, flat.resource_currency, flat.resource_unit,
+        flat.overage_rate, flat.overage_cap, flat.overage_enabled,
+        flat.nickname, flat.idp, flat.user_id, flat.visitor_id, flat.group_id, flat.tags,
+        flat.status, flat.last_error, flat.consecutive_failures, flat.is_active, flat.device_id, flat.assigned_at,
+        flat.created_at, flat.last_used_at, flat.last_checked_at, flat.owner_user_id
+      ]
+      
+      // 检查 undefined 值
+      const undefinedIndexes = values.map((v, i) => v === undefined ? i : -1).filter(i => i !== -1)
+      if (undefinedIndexes.length > 0) {
+        console.error('❌ Found undefined values at indexes:', undefinedIndexes)
+        console.error('❌ Flat object:', JSON.stringify(flat, null, 2))
+        throw new Error(`Undefined values found at positions: ${undefinedIndexes.join(', ')}`)
+      }
+      
       await connection.execute(
         `INSERT INTO accounts (
           id, email, password, 
@@ -85,20 +109,7 @@ export const MySQLAccountDBNew = {
           last_used_at = VALUES(last_used_at),
           last_checked_at = VALUES(last_checked_at),
           owner_user_id = VALUES(owner_user_id)`,
-        [
-          flat.id, flat.email, flat.password,
-          flat.access_token, flat.csrf_token, flat.refresh_token, flat.x_amz_sso_authn, flat.client_id, flat.client_secret, flat.region, flat.expires_at, flat.auth_method, flat.provider,
-          flat.subscription_type, flat.subscription_title, flat.subscription_raw_type, flat.subscription_expires_at, flat.subscription_days_remaining,
-          flat.upgrade_capability, flat.overage_capability, flat.management_target,
-          flat.usage_current, flat.usage_limit, flat.usage_percent_used, flat.usage_last_updated,
-          flat.base_limit, flat.base_current, flat.free_trial_limit, flat.free_trial_current, flat.free_trial_expiry,
-          flat.usage_bonuses, flat.next_reset_date,
-          flat.resource_type, flat.resource_display_name, flat.resource_display_name_plural, flat.resource_currency, flat.resource_unit,
-          flat.overage_rate, flat.overage_cap, flat.overage_enabled,
-          flat.nickname, flat.idp, flat.user_id, flat.visitor_id, flat.group_id, flat.tags,
-          flat.status, flat.last_error, flat.consecutive_failures, flat.is_active, flat.device_id, flat.assigned_at,
-          flat.created_at, flat.last_used_at, flat.last_checked_at, flat.owner_user_id
-        ]
+        values
       )
       
       return account

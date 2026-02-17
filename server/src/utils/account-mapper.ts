@@ -83,7 +83,8 @@ export function accountToFlat(account: Account): AccountFlatDB {
     assigned_at: account.assignedAt ?? null,
     created_at: account.createdAt,
     last_used_at: account.lastUsedAt ?? null,
-    last_checked_at: account.lastCheckedAt ?? null
+    last_checked_at: account.lastCheckedAt ?? null,
+    owner_user_id: null  // 预留字段，用于多用户系统
   }
 }
 
