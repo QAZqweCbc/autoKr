@@ -1,0 +1,240 @@
+/* ImportAccountView页面样式 */
+
+.import-account-view {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: clamp(20px, 3vh, 2rem);
+}
+
+.header h1 {
+  font-size: clamp(24px, 5vw, 2rem);
+  margin-bottom: 0.5rem;
+  color: #2c3e50;
+}
+
+.subtitle {
+  color: #7f8c8d;
+  font-size: clamp(14px, 2.5vw, 1rem);
+}
+
+.import-container {
+  background: white;
+  border-radius: 12px;
+  padding: clamp(16px, 3vw, 2rem);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.import-mode-tabs {
+  display: flex;
+  gap: clamp(8px, 1.5vw, 1rem);
+  margin-bottom: clamp(16px, 3vh, 2rem);
+  border-bottom: 2px solid #ecf0f1;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tab {
+  padding: clamp(10px, 1.5vh, 0.75rem) clamp(12px, 2vw, 1.5rem);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-size: clamp(14px, 2.5vw, 1rem);
+  color: #7f8c8d;
+  transition: all 0.3s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tab:hover {
+  color: #3498db;
+}
+
+.tab.active {
+  color: #3498db;
+  border-bottom-color: #3498db;
+  font-weight: 600;
+}
+
+.import-section {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 2vh, 1.5rem);
+}
+
+.info-box {
+  display: flex;
+  gap: clamp(8px, 1.5vw, 1rem);
+  padding: clamp(12px, 2vw, 1.5rem);
+  background: #e3f2fd;
+  border-radius: 8px;
+  border-left: 4px solid #2196f3;
+  flex-wrap: wrap;
+}
+
+.info-icon {
+  font-size: clamp(20px, 3vw, 1.5rem);
+  flex-shrink: 0;
+}
+
+.info-content {
+  flex: 1;
+  min-width: 200px;
+}
+
+.info-content h3 {
+  margin: 0 0 0.5rem 0;
+  color: #1976d2;
+  font-size: clamp(14px, 2.5vw, 1rem);
+}
+
+.info-content ol {
+  margin: 0;
+  padding-left: clamp(16px, 3vw, 1.5rem);
+  color: #555;
+  font-size: clamp(13px, 2.2vw, 14px);
+}
+
+.info-content ol li {
+  margin-bottom: 0.25rem;
+}
+
+.info-content code {
+  background: #fff;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: clamp(12px, 2vw, 0.9rem);
+  word-break: break-all;
+}
+
+.info-content a {
+  color: #2196f3;
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.info-content a:hover {
+  text-decoration: underline;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.json-input,
+.text-input,
+.select-input {
+  padding: clamp(10px, 1.5vh, 0.75rem);
+  border: 2px solid #ecf0f1;
+  border-radius: 8px;
+  font-size: clamp(13px, 2.2vw, 0.95rem);
+  font-family: 'Courier New', monospace;
+  transition: border-color 0.3s;
+  width: 100%;
+}
+
+.json-input:focus,
+.text-input:focus,
+.select-input:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.json-input {
+  resize: vertical;
+  min-height: clamp(120px, 20vh, 150px);
+}
+
+.input-hint {
+  font-size: clamp(12px, 2vw, 0.85rem);
+  color: #7f8c8d;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn-primary {
+  padding: clamp(10px, 1.5vh, 1rem) clamp(16px, 3vw, 2rem);
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: clamp(14px, 2.5vw, 1rem);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  width: 100%;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2980b9;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+.btn-primary:disabled {
+  background: #bdc3c7;
+  cursor: not-allowed;
+}
+
+.action-buttons {
+  display: flex;
+  gap: clamp(8px, 1.5vw, 1rem);
+  margin-top: clamp(8px, 1.5vh, 1rem);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 639px) {
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .action-buttons > * {
+    width: 100%;
+  }
+}
+
+.btn-secondary {
+  padding: clamp(10px, 1.5vh, 0.75rem) clamp(12px, 2vw, 1.5rem);
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: clamp(13px, 2.2vw, 0.95rem);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  flex: 1;
+}
+
+.btn-secondary:hover {
+  background: #5a6268;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 639px) {
+  .import-mode-tabs {
+    justify-content: flex-start;
+  }
+
+  .info-box {
+    flex-direction: column;
+  }
+
+  .form-group {
+    width: 100%;
+  }
+}

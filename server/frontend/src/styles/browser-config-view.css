@@ -1,0 +1,29 @@
+/* BrowserConfigView页面样式 */
+
+.browser-config-view {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.browser-card {
+  padding: clamp(12px, 2vw, 16px);
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 12px;
+}
+
+.browser-card:hover {
+  background: #f8fafc;
+  border-color: #667eea;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+@media (max-width: 639px) {
+  .browser-card:hover {
+    transform: translateX(2px);
+  }
+}

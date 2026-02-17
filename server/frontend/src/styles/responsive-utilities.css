@@ -1,0 +1,326 @@
+/* 🎯 全局响应式工具类库 */
+
+/* ============================================
+   响应式断点系统
+   ============================================ */
+:root {
+  /* 断点定义 */
+  --breakpoint-xs: 0px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+
+  /* 流体间距 */
+  --spacing-xs: clamp(4px, 0.5vw, 8px);
+  --spacing-sm: clamp(8px, 1vw, 12px);
+  --spacing-md: clamp(12px, 1.5vw, 16px);
+  --spacing-lg: clamp(16px, 2vw, 24px);
+  --spacing-xl: clamp(24px, 3vw, 32px);
+  --spacing-2xl: clamp(32px, 4vw, 48px);
+
+  /* 流体字体 */
+  --font-xs: clamp(12px, 2vw, 13px);
+  --font-sm: clamp(13px, 2.2vw, 14px);
+  --font-base: clamp(14px, 2.5vw, 16px);
+  --font-lg: clamp(16px, 3vw, 18px);
+  --font-xl: clamp(18px, 3.5vw, 20px);
+  --font-2xl: clamp(20px, 4vw, 24px);
+  --font-3xl: clamp(24px, 5vw, 32px);
+  --font-4xl: clamp(28px, 6vw, 40px);
+
+  /* 容器最大宽度 */
+  --container-sm: 640px;
+  --container-md: 768px;
+  --container-lg: 1024px;
+  --container-xl: 1280px;
+  --container-2xl: 1400px;
+}
+
+/* ============================================
+   通用页面容器
+   ============================================ */
+.page-view {
+  max-width: var(--container-2xl);
+  margin: 0 auto;
+}
+
+@media (max-width: 639px) {
+  .page-view {
+    /* 移动端无需额外 padding，由 .main-content 统一管理 */
+  }
+}
+
+/* ============================================
+   响应式网格系统
+   ============================================ */
+.grid-responsive {
+  display: grid;
+  gap: var(--spacing-lg);
+}
+
+/* 自适应列 */
+.grid-auto-fit {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+}
+
+.grid-auto-fill {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+}
+
+/* 固定列数（响应式） */
+.grid-cols-1 { grid-template-columns: 1fr; }
+.grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+@media (max-width: 1023px) {
+  .grid-cols-4 { grid-template-columns: repeat(2, 1fr); }
+  .grid-cols-3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 639px) {
+  .grid-cols-4,
+  .grid-cols-3,
+  .grid-cols-2 { 
+    grid-template-columns: 1fr; 
+  }
+}
+
+/* ============================================
+   响应式 Flex 布局
+   ============================================ */
+.flex-responsive {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.flex-responsive-nowrap {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+@media (max-width: 767px) {
+  .flex-responsive-nowrap {
+    flex-wrap: wrap;
+  }
+}
+
+/* ============================================
+   响应式文字大小
+   ============================================ */
+.text-responsive-xs { font-size: var(--font-xs); }
+.text-responsive-sm { font-size: var(--font-sm); }
+.text-responsive-base { font-size: var(--font-base); }
+.text-responsive-lg { font-size: var(--font-lg); }
+.text-responsive-xl { font-size: var(--font-xl); }
+.text-responsive-2xl { font-size: var(--font-2xl); }
+.text-responsive-3xl { font-size: var(--font-3xl); }
+.text-responsive-4xl { font-size: var(--font-4xl); }
+
+/* ============================================
+   响应式间距
+   ============================================ */
+.spacing-responsive-xs { gap: var(--spacing-xs); }
+.spacing-responsive-sm { gap: var(--spacing-sm); }
+.spacing-responsive-md { gap: var(--spacing-md); }
+.spacing-responsive-lg { gap: var(--spacing-lg); }
+.spacing-responsive-xl { gap: var(--spacing-xl); }
+.spacing-responsive-2xl { gap: var(--spacing-2xl); }
+
+/* ============================================
+   响应式显示/隐藏
+   ============================================ */
+/* 移动端隐藏 */
+@media (max-width: 639px) {
+  .hidden-mobile { display: none !important; }
+}
+
+/* 平板隐藏 */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .hidden-tablet { display: none !important; }
+}
+
+/* 桌面隐藏 */
+@media (min-width: 1024px) {
+  .hidden-desktop { display: none !important; }
+}
+
+/* 仅移动端显示 */
+.show-mobile { display: none !important; }
+@media (max-width: 639px) {
+  .show-mobile { display: block !important; }
+}
+
+/* ============================================
+   响应式卡片
+   ============================================ */
+.card-responsive {
+  padding: var(--spacing-lg);
+  border-radius: clamp(8px, 1.5vw, 12px);
+}
+
+@media (max-width: 639px) {
+  .card-responsive {
+    padding: var(--spacing-md);
+  }
+}
+
+/* ============================================
+   响应式表格容器
+   ============================================ */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 767px) {
+  .table-responsive {
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  .table-responsive table {
+    min-width: 600px;
+  }
+}
+
+/* ============================================
+   响应式按钮
+   ============================================ */
+.btn-responsive {
+  padding: clamp(8px, 1.5vh, 12px) clamp(16px, 3vw, 24px);
+  font-size: var(--font-base);
+  white-space: nowrap;
+}
+
+.btn-group-responsive {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 639px) {
+  .btn-group-responsive {
+    flex-direction: column;
+  }
+
+  .btn-group-responsive > * {
+    width: 100%;
+  }
+}
+
+/* ============================================
+   响应式表单
+   ============================================ */
+.form-responsive {
+  display: grid;
+  gap: var(--spacing-lg);
+}
+
+.form-row-responsive {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: var(--spacing-md);
+}
+
+@media (max-width: 639px) {
+  .form-row-responsive {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================
+   响应式标题
+   ============================================ */
+.page-title-responsive {
+  font-size: var(--font-3xl);
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: var(--spacing-sm);
+}
+
+.page-subtitle-responsive {
+  font-size: var(--font-base);
+  color: #64748b;
+  margin-bottom: var(--spacing-xl);
+}
+
+/* ============================================
+   响应式图片/媒体
+   ============================================ */
+.media-responsive {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  object-fit: cover;
+}
+
+.aspect-ratio-16-9 {
+  aspect-ratio: 16 / 9;
+}
+
+.aspect-ratio-4-3 {
+  aspect-ratio: 4 / 3;
+}
+
+.aspect-ratio-1-1 {
+  aspect-ratio: 1 / 1;
+}
+
+/* ============================================
+   响应式容器查询支持
+   ============================================ */
+@supports (container-type: inline-size) {
+  .container-responsive {
+    container-type: inline-size;
+  }
+
+  @container (max-width: 400px) {
+    .container-responsive .compact-layout {
+      flex-direction: column;
+    }
+  }
+}
+
+/* ============================================
+   移动端优化
+   ============================================ */
+@media (max-width: 639px) {
+  /* 触摸目标最小尺寸 */
+  button,
+  a,
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* 移动端字体优化 */
+  body {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* 移动端滚动优化 */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ============================================
+   打印样式
+   ============================================ */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .page-view {
+    max-width: 100%;
+    padding: 0;
+  }
+}

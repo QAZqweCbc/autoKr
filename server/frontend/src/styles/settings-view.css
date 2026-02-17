@@ -1,0 +1,218 @@
+/* SettingsView页面样式 */
+
+.settings-view {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: clamp(20px, 3vh, 2rem);
+}
+
+.header h1 {
+  font-size: clamp(24px, 5vw, 2rem);
+  margin-bottom: 0.5rem;
+  color: #2c3e50;
+}
+
+.subtitle {
+  color: #7f8c8d;
+  font-size: clamp(14px, 2.5vw, 1rem);
+}
+
+.settings-container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 3vh, 2rem);
+}
+
+.settings-section {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.section-header {
+  padding: clamp(16px, 2.5vw, 1.5rem) clamp(16px, 3vw, 2rem);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.section-header h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: clamp(18px, 3vw, 1.5rem);
+}
+
+.section-desc {
+  margin: 0;
+  opacity: 0.9;
+  font-size: clamp(13px, 2.2vw, 0.95rem);
+}
+
+.settings-card {
+  padding: clamp(16px, 3vw, 2rem);
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: clamp(12px, 2vw, 1.5rem);
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.setting-item:last-child {
+  margin-bottom: 0;
+}
+
+.setting-info {
+  flex: 1;
+  margin-right: clamp(12px, 2vw, 2rem);
+  min-width: 200px;
+}
+
+.setting-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: clamp(15px, 2.5vw, 1.1rem);
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.label-icon {
+  font-size: clamp(18px, 3vw, 1.3rem);
+}
+
+.setting-desc {
+  margin: 0;
+  color: #7f8c8d;
+  font-size: clamp(13px, 2.2vw, 0.9rem);
+}
+
+@media (max-width: 639px) {
+  .setting-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .setting-info {
+    margin-right: 0;
+    width: 100%;
+  }
+}
+
+.refresh-status {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: #e3f2fd;
+  border-radius: 8px;
+  border-left: 4px solid #2196f3;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+}
+
+.status-item.status-warning {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.status-item.status-warning .status-label {
+  color: #f59e0b;
+}
+
+.status-item.status-warning .status-value {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.status-label {
+  color: #555;
+  font-weight: 500;
+}
+
+.status-value {
+  color: #2196f3;
+  font-weight: 600;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: clamp(12px, 2vw, 1.5rem);
+}
+
+@media (max-width: 639px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.action-buttons {
+  display: flex;
+  gap: clamp(8px, 1.5vw, 1rem);
+  margin-top: clamp(12px, 2vh, 1.5rem);
+  padding-top: clamp(12px, 2vh, 1.5rem);
+  border-top: 1px solid #ecf0f1;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 639px) {
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .action-buttons > * {
+    width: 100%;
+  }
+}
+
+.db-config-form {
+  padding: 0;
+}
+
+.form-section {
+  margin-bottom: 24px;
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}

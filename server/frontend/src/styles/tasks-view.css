@@ -1,0 +1,234 @@
+/* TasksView页面样式 */
+
+.tasks-view {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: clamp(20px, 4vh, 32px);
+  animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2vw, 16px);
+  font-size: clamp(24px, 5vw, 32px);
+  font-weight: 800;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.title-icon {
+  font-size: clamp(32px, 6vw, 40px);
+  filter: drop-shadow(0 4px 8px rgba(102, 126, 234, 0.3));
+}
+
+.page-subtitle {
+  color: #64748b;
+  font-size: clamp(14px, 2.5vw, 16px);
+  margin-left: clamp(0px, 8vw, 56px);
+}
+
+@media (max-width: 639px) {
+  .page-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .page-subtitle {
+    margin-left: 0;
+  }
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  gap: clamp(12px, 2vw, 20px);
+  margin-bottom: clamp(20px, 4vh, 32px);
+  animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.1s backwards;
+}
+
+@media (max-width: 639px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.quick-tip {
+  margin-bottom: clamp(20px, 4vh, 32px);
+  animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.2s backwards;
+}
+
+.quick-tip-content {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 3vw, 20px);
+  padding: clamp(8px, 1.5vh, 12px) 0;
+  flex-wrap: wrap;
+}
+
+.tip-icon {
+  font-size: clamp(36px, 7vw, 48px);
+  filter: drop-shadow(0 4px 8px rgba(102, 126, 234, 0.3));
+  animation: bounce 2s infinite;
+  flex-shrink: 0;
+}
+
+.tip-text {
+  flex: 1;
+  min-width: 200px;
+}
+
+.tip-title {
+  font-size: clamp(16px, 3vw, 18px);
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #1e293b;
+}
+
+.tip-desc {
+  font-size: clamp(13px, 2.2vw, 14px);
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: clamp(12px, 2vw, 20px);
+  flex-wrap: wrap;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1.5vw, 12px);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1.5vw, 12px);
+  flex: 0;
+  margin-left: auto;
+  margin-right: auto;
+  flex-wrap: wrap;
+}
+
+.header-title {
+  font-weight: 700;
+  font-size: clamp(16px, 2.5vw, 18px);
+  color: #1e293b;
+}
+
+.header-right {
+  display: flex;
+  gap: clamp(8px, 1.5vw, 12px);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 639px) {
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-center {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .header-right {
+    width: 100%;
+  }
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.email-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Monaco', 'Courier New', monospace;
+}
+
+.email-icon {
+  font-size: 16px;
+}
+
+.time-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.time-icon {
+  font-size: 14px;
+}
+
+.error-text {
+  color: #ef4444;
+  font-size: 13px;
+}
+
+.empty-desc {
+  text-align: center;
+}
+
+.empty-desc p {
+  color: #64748b;
+  margin-bottom: 16px;
+  font-size: 15px;
+}
+
+.tag-success {
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+  border: none !important;
+  color: white !important;
+}
+
+.tag-warning {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  border: none !important;
+  color: white !important;
+}
+
+.tag-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+  border: none !important;
+  color: white !important;
+}
+
+.tag-info {
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+  border: none !important;
+  color: white !important;
+}
+
+.tag-purple {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed) !important;
+  border: none !important;
+  color: white !important;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}

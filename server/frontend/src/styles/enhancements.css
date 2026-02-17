@@ -1,0 +1,616 @@
+/* 🎨 Kiro Server - 视觉增强样式 */
+
+/* ============================================
+   全局容器背景色
+   ============================================ */
+:root {
+  --container-bg: #f8fafc;
+  --container-border: #e2e8f0;
+}
+
+/* ============================================
+   页面容器增强
+   ============================================ */
+.page-container {
+  animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================
+   卡片增强效果
+   ============================================ */
+.glass-card {
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 8px 32px rgba(102, 126, 234, 0.1) !important;
+}
+
+.gradient-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+  border: 1px solid rgba(102, 126, 234, 0.1) !important;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.gradient-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+}
+
+.gradient-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(102, 126, 234, 0.15) !important;
+  border-color: rgba(102, 126, 234, 0.3) !important;
+}
+
+/* 为所有 el-card 添加悬停效果 */
+.el-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.el-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.12) !important;
+}
+
+/* ============================================
+   按钮增强
+   ============================================ */
+.btn-gradient {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  border: none !important;
+  color: white !important;
+  font-weight: 600 !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-gradient::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.btn-gradient:hover::before {
+  left: 100%;
+}
+
+.btn-gradient:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4) !important;
+}
+
+/* ============================================
+   表格增强
+   ============================================ */
+.enhanced-table {
+  border-radius: 12px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+}
+
+.enhanced-table .el-table__header th {
+  background: linear-gradient(to bottom, #f8fafc, #f1f5f9) !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  color: #64748b !important;
+}
+
+.enhanced-table .el-table__row {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.enhanced-table .el-table__row:hover {
+  background: #f8fafc !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.08);
+}
+
+/* 为所有表格添加行悬停效果 */
+.el-table__row {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.el-table__row:hover {
+  background: #f8fafc !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.08) !important;
+}
+
+/* ============================================
+   标签增强
+   ============================================ */
+.tag-success {
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+  border: none !important;
+  color: white !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3) !important;
+}
+
+.tag-warning {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  border: none !important;
+  color: white !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3) !important;
+}
+
+.tag-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+  border: none !important;
+  color: white !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3) !important;
+}
+
+.tag-info {
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+  border: none !important;
+  color: white !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* ============================================
+   输入框增强
+   ============================================ */
+.enhanced-input .el-input__wrapper {
+  border-radius: 10px !important;
+  transition: all 0.3s !important;
+  border: 2px solid transparent !important;
+}
+
+.enhanced-input .el-input__wrapper:hover {
+  border-color: rgba(102, 126, 234, 0.3) !important;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1) !important;
+}
+
+.enhanced-input .el-input__wrapper.is-focus {
+  border-color: #667eea !important;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1) !important;
+}
+
+/* ============================================
+   Alert 增强
+   ============================================ */
+.alert-gradient {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1)) !important;
+  border: 1px solid rgba(102, 126, 234, 0.2) !important;
+  border-left: 4px solid #667eea !important;
+}
+
+.alert-success-gradient {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1)) !important;
+  border: 1px solid rgba(16, 185, 129, 0.2) !important;
+  border-left: 4px solid #10b981 !important;
+}
+
+.alert-warning-gradient {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.1)) !important;
+  border: 1px solid rgba(245, 158, 11, 0.2) !important;
+  border-left: 4px solid #f59e0b !important;
+}
+
+/* ============================================
+   加载动画
+   ============================================ */
+.loading-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.loading-bounce {
+  animation: bounce 1s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(-25%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+/* ============================================
+   工具类
+   ============================================ */
+.text-gradient {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.shadow-glow {
+  box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+}
+
+.hover-lift {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+}
+
+/* ============================================
+   响应式优化
+   ============================================ */
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0 !important;
+    padding: 16px !important;
+  }
+  
+  .sidebar {
+    transform: translateX(-100%);
+  }
+  
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+}
+
+/* ============================================
+   深色模式支持
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+  .glass-card {
+    background: rgba(30, 41, 59, 0.9) !important;
+  }
+  
+  .gradient-card {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+  }
+}
+
+/* ============================================
+   全局响应式增强
+   ============================================ */
+
+/* 页面容器响应式 */
+.page-container {
+  /* padding 由 App.vue 的 .main-content 统一管理 */
+}
+
+/* 卡片响应式间距 */
+.el-card {
+  margin-bottom: clamp(12px, 2vh, 16px);
+}
+
+.el-card__header {
+  padding: clamp(14px, 2vw, 18px) clamp(16px, 2.5vw, 20px);
+}
+
+.el-card__body {
+  padding: clamp(16px, 2.5vw, 20px);
+}
+
+/* 按钮组响应式 */
+.el-button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 639px) {
+  .el-button-group {
+    flex-direction: column;
+  }
+
+  .el-button-group .el-button {
+    width: 100%;
+    margin-left: 0 !important;
+  }
+}
+
+/* 表单响应式 */
+.el-form {
+  width: 100%;
+}
+
+.el-form-item {
+  margin-bottom: clamp(16px, 2.5vh, 22px);
+}
+
+.el-form-item__label {
+  font-size: clamp(13px, 2.2vw, 14px);
+}
+
+.el-form-item__content {
+  font-size: clamp(13px, 2.2vw, 14px);
+}
+
+/* 对话框响应式 */
+@media (max-width: 639px) {
+  .el-dialog {
+    width: 95% !important;
+    margin: 0 auto !important;
+  }
+
+  .el-dialog__header {
+    padding: clamp(12px, 2vh, 16px);
+  }
+
+  .el-dialog__body {
+    padding: clamp(12px, 2vh, 16px);
+  }
+
+  .el-dialog__footer {
+    padding: clamp(12px, 2vh, 16px);
+  }
+}
+
+/* 标签响应式 */
+.el-tag {
+  font-size: clamp(12px, 2vw, 13px);
+  padding: clamp(4px, 0.5vh, 6px) clamp(8px, 1vw, 10px);
+}
+
+/* 分页响应式 */
+@media (max-width: 639px) {
+  .el-pagination {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .el-pagination .el-pager {
+    flex-wrap: wrap;
+  }
+
+  .el-pagination__sizes {
+    margin: 0 !important;
+  }
+
+  .el-pagination__jump {
+    margin-left: 0 !important;
+  }
+}
+
+/* 下拉菜单响应式 */
+@media (max-width: 639px) {
+  .el-dropdown-menu {
+    max-width: 90vw;
+  }
+}
+
+/* 消息提示响应式 */
+@media (max-width: 639px) {
+  .el-message {
+    min-width: auto !important;
+    max-width: 90vw;
+    padding: clamp(12px, 2vh, 15px) clamp(16px, 3vw, 20px);
+  }
+
+  .el-notification {
+    width: 90vw !important;
+    right: 5vw !important;
+  }
+}
+
+/* 表格响应式优化 */
+@media (max-width: 767px) {
+  .el-table {
+    font-size: clamp(12px, 2vw, 13px);
+  }
+
+  .el-table th,
+  .el-table td {
+    padding: clamp(8px, 1.5vh, 12px) clamp(6px, 1vw, 10px);
+  }
+
+  .el-table__header th {
+    font-size: clamp(11px, 2vw, 12px);
+  }
+
+  /* 表格横向滚动容器 */
+  .el-table__body-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* 输入框响应式 */
+.el-input__inner,
+.el-textarea__inner {
+  font-size: clamp(13px, 2.2vw, 14px);
+  padding: clamp(8px, 1.5vh, 12px) clamp(12px, 2vw, 15px);
+}
+
+/* 选择器响应式 */
+.el-select {
+  width: 100%;
+}
+
+@media (max-width: 639px) {
+  .el-select-dropdown {
+    max-width: 90vw;
+  }
+}
+
+/* 日期选择器响应式 */
+@media (max-width: 639px) {
+  .el-date-picker,
+  .el-date-range-picker {
+    width: 90vw !important;
+  }
+}
+
+/* 抽屉响应式 */
+@media (max-width: 639px) {
+  .el-drawer {
+    width: 90% !important;
+  }
+
+  .el-drawer.rtl {
+    width: 90% !important;
+  }
+}
+
+/* 步骤条响应式 */
+@media (max-width: 639px) {
+  .el-steps {
+    flex-direction: column;
+  }
+
+  .el-steps--horizontal {
+    flex-direction: column;
+  }
+}
+
+/* 时间线响应式 */
+@media (max-width: 639px) {
+  .el-timeline-item__timestamp {
+    font-size: clamp(12px, 2vw, 13px);
+  }
+}
+
+/* 面包屑响应式 */
+@media (max-width: 639px) {
+  .el-breadcrumb {
+    font-size: clamp(12px, 2vw, 13px);
+  }
+
+  .el-breadcrumb__item {
+    display: inline-flex;
+  }
+}
+
+/* 加载更多按钮响应式 */
+.load-more-btn {
+  width: 100%;
+  margin-top: clamp(12px, 2vh, 16px);
+  padding: clamp(10px, 1.5vh, 12px);
+  font-size: clamp(13px, 2.2vw, 14px);
+}
+
+/* 空状态响应式 */
+.el-empty {
+  padding: clamp(24px, 5vh, 40px) clamp(16px, 3vw, 20px);
+}
+
+.el-empty__description {
+  font-size: clamp(13px, 2.2vw, 14px);
+}
+
+/* 统计卡片响应式 */
+.stats-card {
+  padding: clamp(12px, 2vw, 16px);
+  border-radius: clamp(8px, 1.5vw, 12px);
+}
+
+/* 图标响应式 */
+.icon-responsive {
+  font-size: clamp(16px, 3vw, 20px);
+}
+
+.icon-responsive-lg {
+  font-size: clamp(20px, 4vw, 28px);
+}
+
+.icon-responsive-xl {
+  font-size: clamp(28px, 5vw, 40px);
+}
+
+/* 触摸优化 */
+@media (hover: none) and (pointer: coarse) {
+  /* 增加触摸目标大小 */
+  button,
+  a,
+  .el-button,
+  .clickable {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* 移除悬停效果 */
+  .hover-lift:hover {
+    transform: none;
+  }
+
+  .el-card:hover {
+    transform: none;
+  }
+}
+
+/* 横屏模式优化 */
+@media (max-height: 500px) and (orientation: landscape) {
+  .page-header {
+    margin-bottom: 16px;
+  }
+
+  .el-dialog {
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+}
+
+/* 高分辨率屏幕优化 */
+@media (min-width: 1920px) {
+  .page-container {
+    max-width: 1600px;
+  }
+
+  .container-2xl {
+    max-width: 1600px;
+  }
+}
+
+/* 打印优化 */
+@media print {
+  .no-print,
+  .el-button,
+  .el-pagination,
+  .sidebar,
+  .header-actions {
+    display: none !important;
+  }
+
+  .page-container {
+    max-width: 100%;
+    padding: 0;
+  }
+
+  .el-card {
+    box-shadow: none !important;
+    border: 1px solid #ddd;
+  }
+}
