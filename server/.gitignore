@@ -4,8 +4,8 @@ frontend/node_modules/
 
 # Build output
 dist/
-frontend/dist/
-public/assets/
+# frontend/dist/  # 如果需要提交前端构建产物，取消此行注释
+# public/assets/  # 如果需要提交公共资源，取消此行注释
 
 # Data
 data/
@@ -30,7 +30,7 @@ logs/
 # Screenshots and debug files
 *.png
 *.jpg
-*.html
+# *.html  # 警告：这会忽略所有HTML文件，包括 dist/index.html
 debug-*
 
 # OS
