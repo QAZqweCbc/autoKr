@@ -8,6 +8,15 @@ export interface PendingRequest {
   requested_at: number
 }
 
+export interface PendingRevokeRequest {
+  id: string
+  username: string
+  email: string
+  account_email: string
+  revoke_reason: string
+  requested_at: number
+}
+
 export interface User {
   id: string
   username: string
@@ -78,6 +87,21 @@ export const adminApi = {
   // 拒绝申请
   rejectRequest(id: string, reason: string) {
     return axios.post(`/admin/requests/${id}/reject`, { reason })
+  },
+
+  // 获取待审批的释放申请
+  getPendingRevokeRequests() {
+    return axios.get<{ success: boolean; requests: PendingRevokeRequest[] }>('/admin/revoke-requests/pending')
+  },
+
+  // 批准释放申请
+  approveRevokeRequest(id: string) {
+    return axios.post(`/admin/revoke-requests/${id}/approve`)
+  },
+
+  // 拒绝释放申请
+  rejectRevokeRequest(id: string, reason: string) {
+    return axios.post(`/admin/revoke-requests/${id}/reject`, { reason })
   },
 
   // 获取用户列表

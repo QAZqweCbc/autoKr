@@ -103,6 +103,34 @@ export const TokenAllocationService = {
   },
 
   /**
+   * 查询所有待审批的释放申请
+   */
+  async getPendingRevokeRequests(): Promise<any[]> {
+    const connection = await getPool().getConnection()
+    try {
+      const [rows] = await connection.execute(
+        `SELECT 
+          ta.id,
+          ta.user_id,
+          cu.username,
+          cu.email,
+          ta.account_id,
+          a.email as account_email,
+          ta.revoke_reason,
+          ta.requested_at
+        FROM token_allocations ta
+        JOIN client_users cu ON ta.user_id = cu.id
+        LEFT JOIN accounts a ON ta.account_id = a.id
+        WHERE ta.status = 'active' AND ta.revoke_reason IS NOT NULL
+        ORDER BY ta.requested_at DESC`
+      )
+      return rows as any[]
+    } finally {
+      connection.release()
+    }
+  },
+
+  /**
    * 查询所有分配记录
    */
   async getAll(): Promise<any[]> {
@@ -145,6 +173,7 @@ export const TokenAllocationService = {
       if (data.reject_reason !== undefined) { updates.push('reject_reason = ?'); values.push(data.reject_reason) }
       if (data.revoked_at !== undefined) { updates.push('revoked_at = ?'); values.push(data.revoked_at) }
       if (data.revoked_by !== undefined) { updates.push('revoked_by = ?'); values.push(data.revoked_by) }
+      if (data.revoke_reason !== undefined) { updates.push('revoke_reason = ?'); values.push(data.revoke_reason) }
       
       if (updates.length > 0) {
         values.push(id)

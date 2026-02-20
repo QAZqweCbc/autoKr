@@ -9,7 +9,8 @@ import {
   requestToken,
   getMyRequests,
   getMyTokens,
-  refreshToken
+  refreshToken,
+  requestRevoke
 } from '../controllers/token.controller'
 
 const router = Router()
@@ -28,5 +29,8 @@ router.get('/my-tokens', getMyTokens)
 
 // 刷新Token额度
 router.post('/refresh/:accountId', refreshToken)
+
+// 请求释放Token
+router.post('/:id/request-revoke', requestRevoke)
 
 export default router

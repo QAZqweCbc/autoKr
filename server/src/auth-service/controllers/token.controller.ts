@@ -54,11 +54,34 @@ export async function requestToken(req: Request, res: Response) {
     
     await TokenAllocationService.create(allocation)
     
-    res.json({
-      success: true,
-      allocation_id: allocation.id,
-      message: '申请已提交，等待管理员审批'
-    })
+    // 5. 触发自动审批
+    const { processAutoApproval } = await import('../../services/auto-approval.service')
+    const approvalResult = await processAutoApproval(allocation.id)
+    
+    if (approvalResult.approved) {
+      // 自动审批通过
+      return res.json({
+        success: true,
+        allocation_id: allocation.id,
+        message: '申请已自动审批通过',
+        auto_approved: true
+      })
+    } else if (approvalResult.needsGeneration) {
+      // 账号生成中
+      return res.json({
+        success: true,
+        allocation_id: allocation.id,
+        message: '账号构建中，请稍候...',
+        generating: true
+      })
+    } else {
+      // 需要人工审批
+      return res.json({
+        success: true,
+        allocation_id: allocation.id,
+        message: '申请已提交，等待管理员审批'
+      })
+    }
   } catch (error: any) {
     console.error('[Token Request] Error:', error)
     res.status(500).json({
@@ -171,6 +194,77 @@ export async function getMyTokens(req: Request, res: Response) {
     res.status(500).json({
       success: false,
       message: '查询失败',
+      error: error.message
+    })
+  }
+}
+
+/**
+ * 请求释放Token
+ * POST /api/tokens/:id/request-revoke
+ */
+export async function requestRevoke(req: Request, res: Response) {
+  try {
+    const userId = (req as any).user.id
+    const { id } = req.params
+    const { reason } = req.body
+    
+    if (!reason || reason.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供释放理由'
+      })
+    }
+    
+    // 1. 验证分配记录归属
+    const allocation = await TokenAllocationService.getById(id)
+    if (!allocation) {
+      return res.status(404).json({
+        success: false,
+        message: '分配记录不存在'
+      })
+    }
+    
+    if (allocation.user_id !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: '无权操作此Token'
+      })
+    }
+    
+    if (allocation.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: '只能释放活跃的Token'
+      })
+    }
+    
+    // 2. 保存释放理由
+    await TokenAllocationService.update(id, {
+      revoke_reason: reason
+    })
+    
+    // 3. 触发自动审批
+    const { processRevokeAutoApproval } = await import('../../services/auto-approval.service')
+    const approvalResult = await processRevokeAutoApproval(id, reason)
+    
+    if (approvalResult.approved) {
+      return res.json({
+        success: true,
+        message: '释放申请已自动审批通过',
+        auto_approved: true
+      })
+    } else {
+      return res.json({
+        success: true,
+        message: '释放申请已提交，等待管理员审批'
+      })
+    }
+  } catch (error: any) {
+    console.error('[Request Revoke] Error:', error)
+    res.status(500).json({
+      success: false,
+      message: '提交失败',
       error: error.message
     })
   }

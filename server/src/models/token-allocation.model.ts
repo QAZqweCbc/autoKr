@@ -13,6 +13,7 @@ export interface TokenAllocation {
   reject_reason?: string
   revoked_at?: number
   revoked_by?: string
+  revoke_reason?: string | null
 }
 
 export interface TokenAllocationCreateDTO {

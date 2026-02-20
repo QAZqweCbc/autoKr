@@ -141,3 +141,40 @@ export function emitRefreshAlert(alert: RefreshAlertEvent) {
   
   io.emit('refresh:alert', alert)
 }
+
+// ============================================
+// 管理员界面刷新事件
+// ============================================
+
+/**
+ * 通知管理员刷新待审批申请列表
+ */
+export function emitAdminRefreshRequests() {
+  if (!io) return
+  
+  io.emit('admin:refresh:requests', {
+    timestamp: Date.now()
+  })
+}
+
+/**
+ * 通知管理员刷新待审批释放申请列表
+ */
+export function emitAdminRefreshRevokeRequests() {
+  if (!io) return
+  
+  io.emit('admin:refresh:revoke-requests', {
+    timestamp: Date.now()
+  })
+}
+
+/**
+ * 通知管理员刷新分配记录列表
+ */
+export function emitAdminRefreshAllocations() {
+  if (!io) return
+  
+  io.emit('admin:refresh:allocations', {
+    timestamp: Date.now()
+  })
+}

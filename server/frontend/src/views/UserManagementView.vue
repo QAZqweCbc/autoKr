@@ -279,6 +279,69 @@
       />
     </el-card>
 
+    <!-- 待审批的释放申请 -->
+    <el-card style="margin-bottom: 20px;">
+      <template #header>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-weight: 600;">待审批的释放申请</span>
+            <el-tag type="warning" size="small" style="margin-left: 12px;">
+              {{ pendingRevokeRequests.length }} 个待处理
+            </el-tag>
+          </div>
+          <el-button
+            :icon="Refresh"
+            :loading="loading"
+            @click="loadPendingRevokeRequests"
+          >
+            刷新
+          </el-button>
+        </div>
+      </template>
+
+      <el-table
+        v-if="pendingRevokeRequests.length > 0"
+        :data="pendingRevokeRequests"
+        stripe
+        style="width: 100%;"
+      >
+        <el-table-column type="index" label="序号" width="80" />
+        <el-table-column prop="username" label="用户名" width="150" />
+        <el-table-column prop="email" label="邮箱" min-width="180" />
+        <el-table-column prop="account_email" label="账户" min-width="180" />
+        <el-table-column prop="revoke_reason" label="释放理由" min-width="200" />
+        <el-table-column label="申请时间" width="180">
+          <template #default="{ row }">
+            {{ formatTime(row.requested_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              type="success"
+              size="small"
+              @click="handleApproveRevoke(row.id)"
+            >
+              批准
+            </el-button>
+            <el-button
+              type="danger"
+              size="small"
+              @click="handleRejectRevoke(row.id)"
+            >
+              拒绝
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <el-empty
+        v-else
+        description="暂无待审批的释放申请"
+        :image-size="100"
+      />
+    </el-card>
+
     <!-- 用户列表 -->
     <el-card>
       <template #header>
@@ -562,8 +625,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Search, Document, CircleCheck, Link, Warning } from '@element-plus/icons-vue'
-import { adminApi, type User, type PendingRequest, type TokenAllocation, type AccountStats, type AccountDetail } from '../api/admin'
+import { adminApi, type User, type PendingRequest, type PendingRevokeRequest, type TokenAllocation, type AccountStats, type AccountDetail } from '../api/admin'
 import { useAdmin } from '../composables/useAdmin'
+import { useWebSocketStore } from '../stores/websocket'
 import {
   formatTime,
   formatNumber,
@@ -578,6 +642,9 @@ import '../styles/user-management.css'
 // 使用管理员认证
 const { logout, requireAuth } = useAdmin()
 
+// 使用WebSocket
+const wsStore = useWebSocketStore()
+
 // 状态
 const loading = ref(false)
 const approving = ref<string | null>(null)
@@ -586,6 +653,7 @@ const searchText = ref('')
 
 // 数据
 const pendingRequests = ref<PendingRequest[]>([])
+const pendingRevokeRequests = ref<PendingRevokeRequest[]>([])
 const users = ref<User[]>([])
 const allocations = ref<TokenAllocation[]>([])
 const accountDetails = ref<AccountDetail[]>([])
@@ -644,6 +712,18 @@ async function loadPendingRequests() {
     ElMessage.error(error.response?.data?.message || '加载失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 加载待审批的释放申请
+async function loadPendingRevokeRequests() {
+  try {
+    const { data } = await adminApi.getPendingRevokeRequests()
+    if (data.success) {
+      pendingRevokeRequests.value = data.requests
+    }
+  } catch (error: any) {
+    console.error('加载待审批释放申请失败:', error)
   }
 }
 
@@ -717,6 +797,35 @@ async function handleApprove(id: string) {
     ElMessage.error(error.response?.data?.message || '批准失败')
   } finally {
     approving.value = null
+  }
+}
+
+// 批准释放申请
+async function handleApproveRevoke(id: string) {
+  try {
+    const { data } = await adminApi.approveRevokeRequest(id)
+    if (data.success) {
+      ElMessage.success('释放申请已批准')
+      await Promise.all([
+        loadPendingRevokeRequests(),
+        loadAllocations()
+      ])
+    }
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.message || '批准失败')
+  }
+}
+
+// 拒绝释放申请
+async function handleRejectRevoke(id: string) {
+  try {
+    const { data } = await adminApi.rejectRevokeRequest(id, '管理员拒绝')
+    if (data.success) {
+      ElMessage.success('释放申请已拒绝')
+      await loadPendingRevokeRequests()
+    }
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.message || '拒绝失败')
   }
 }
 
@@ -876,10 +985,27 @@ onMounted(async () => {
 
   await Promise.all([
     loadPendingRequests(),
+    loadPendingRevokeRequests(),
     loadUsers(),
     loadAllocations(),
     loadAccountStats(),
     loadAccountDetails()
   ])
+
+  // 连接WebSocket并监听事件
+  wsStore.connect()
+  
+  // 监听管理员刷新事件
+  wsStore.socket?.on('admin:refresh-requests', () => {
+    loadPendingRequests()
+  })
+  
+  wsStore.socket?.on('admin:refresh-revoke-requests', () => {
+    loadPendingRevokeRequests()
+  })
+  
+  wsStore.socket?.on('admin:refresh-allocations', () => {
+    loadAllocations()
+  })
 })
 </script>

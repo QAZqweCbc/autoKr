@@ -569,6 +569,125 @@ export async function getAccountDetails(req: Request, res: Response) {
 
 
 /**
+ * 查看待审批的释放申请
+ * GET /api/admin/revoke-requests/pending
+ */
+export async function getPendingRevokeRequests(req: Request, res: Response) {
+  try {
+    const requests = await TokenAllocationService.getPendingRevokeRequests()
+    
+    res.json({
+      success: true,
+      requests
+    })
+  } catch (error: any) {
+    console.error('[Get Pending Revoke Requests] Error:', error)
+    res.status(500).json({
+      success: false,
+      message: '查询失败',
+      error: error.message
+    })
+  }
+}
+
+/**
+ * 批准释放申请
+ * POST /api/admin/revoke-requests/:id/approve
+ */
+export async function approveRevokeRequest(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    const adminId = (req as any).user.id
+    
+    // 1. 查询分配记录
+    const allocation = await TokenAllocationService.getById(id)
+    if (!allocation) {
+      return res.status(404).json({
+        success: false,
+        message: '申请不存在'
+      })
+    }
+    
+    if (allocation.status !== 'active' || !allocation.revoke_reason) {
+      return res.status(400).json({
+        success: false,
+        message: '无效的释放申请'
+      })
+    }
+    
+    // 2. 更新分配记录
+    await TokenAllocationService.update(id, {
+      status: 'revoked',
+      revoked_at: Date.now(),
+      revoked_by: adminId
+    })
+    
+    // 3. 释放账号
+    if (allocation.account_id) {
+      await MySQLAccountDB.update(allocation.account_id, {
+        status: 'active'
+      })
+    }
+    
+    res.json({
+      success: true,
+      message: '释放申请已批准'
+    })
+  } catch (error: any) {
+    console.error('[Approve Revoke Request] Error:', error)
+    res.status(500).json({
+      success: false,
+      message: '批准失败',
+      error: error.message
+    })
+  }
+}
+
+/**
+ * 拒绝释放申请
+ * POST /api/admin/revoke-requests/:id/reject
+ */
+export async function rejectRevokeRequest(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    const { reason } = req.body
+    
+    // 1. 查询分配记录
+    const allocation = await TokenAllocationService.getById(id)
+    if (!allocation) {
+      return res.status(404).json({
+        success: false,
+        message: '申请不存在'
+      })
+    }
+    
+    if (allocation.status !== 'active' || !allocation.revoke_reason) {
+      return res.status(400).json({
+        success: false,
+        message: '无效的释放申请'
+      })
+    }
+    
+    // 2. 清除释放理由（拒绝释放）
+    await TokenAllocationService.update(id, {
+      revoke_reason: null
+    })
+    
+    res.json({
+      success: true,
+      message: '释放申请已拒绝'
+    })
+  } catch (error: any) {
+    console.error('[Reject Revoke Request] Error:', error)
+    res.status(500).json({
+      success: false,
+      message: '拒绝失败',
+      error: error.message
+    })
+  }
+}
+
+/**
  * Token池统计
  * GET /api/admin/stats/pool
  */
@@ -666,6 +785,52 @@ export async function refreshAllAccounts(req: Request, res: Response) {
     res.status(500).json({
       success: false,
       message: '刷新失败',
+      error: error.message
+    })
+  }
+}
+
+/**
+ * 获取账号池状态
+ * GET /api/admin/account-pool/status
+ */
+export async function getAccountPoolStatus(req: Request, res: Response) {
+  try {
+    const { getAccountPoolStatus } = await import('../services/account-pool.service')
+    const status = await getAccountPoolStatus()
+    
+    res.json({
+      success: true,
+      status
+    })
+  } catch (error: any) {
+    console.error('[Get Account Pool Status] Error:', error)
+    res.status(500).json({
+      success: false,
+      message: '查询失败',
+      error: error.message
+    })
+  }
+}
+
+/**
+ * 手动触发账号池补充
+ * POST /api/admin/account-pool/replenish
+ */
+export async function replenishAccountPool(req: Request, res: Response) {
+  try {
+    const { checkAndReplenishPool } = await import('../services/account-pool.service')
+    await checkAndReplenishPool()
+    
+    res.json({
+      success: true,
+      message: '账号池补充任务已触发'
+    })
+  } catch (error: any) {
+    console.error('[Replenish Account Pool] Error:', error)
+    res.status(500).json({
+      success: false,
+      message: '触发失败',
       error: error.message
     })
   }

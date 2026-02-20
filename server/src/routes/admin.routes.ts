@@ -10,6 +10,9 @@ import {
   getPendingRequests,
   approveRequest,
   rejectRequest,
+  getPendingRevokeRequests,
+  approveRevokeRequest,
+  rejectRevokeRequest,
   getAllUsers,
   getAllAllocations,
   revokeAllocation,
@@ -18,7 +21,9 @@ import {
   getAccountStats,
   getAccountDetails,
   getPoolStats,
-  refreshAllAccounts
+  refreshAllAccounts,
+  getAccountPoolStatus,
+  replenishAccountPool
 } from '../controllers/admin.controller'
 
 const router = Router()
@@ -33,6 +38,11 @@ router.use(authMiddleware, adminMiddleware)
 router.get('/requests/pending', getPendingRequests)
 router.post('/requests/:id/approve', approveRequest)
 router.post('/requests/:id/reject', rejectRequest)
+
+// 释放申请管理
+router.get('/revoke-requests/pending', getPendingRevokeRequests)
+router.post('/revoke-requests/:id/approve', approveRevokeRequest)
+router.post('/revoke-requests/:id/reject', rejectRevokeRequest)
 
 // 用户管理
 router.get('/users', getAllUsers)
@@ -50,5 +60,9 @@ router.get('/stats/pool', getPoolStats)
 
 // 账户管理
 router.post('/accounts/refresh-all', refreshAllAccounts)
+
+// 账号池管理
+router.get('/account-pool/status', getAccountPoolStatus)
+router.post('/account-pool/replenish', replenishAccountPool)
 
 export default router

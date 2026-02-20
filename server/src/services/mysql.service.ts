@@ -70,6 +70,10 @@ export async function initMySQL(config: MySQLConfig) {
     // 创建刷新日志表
     await createRefreshLogsTable()
     
+    // 运行数据库迁移
+    const { migrateAddRevokeReason } = await import('../migrations/add-revoke-reason')
+    await migrateAddRevokeReason()
+    
     return true
   } catch (error: any) {
     console.error('\n' + '='.repeat(60))

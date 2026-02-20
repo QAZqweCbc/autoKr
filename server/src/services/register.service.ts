@@ -244,6 +244,14 @@ async function executeTask(task: Task) {
         console.log(`💾 账号已保存到数据库`)
         log('💾 账号已保存')
         
+        // 触发自动分配给等待的用户
+        try {
+          const { handleAccountGenerationComplete } = await import('./auto-approval.service')
+          await handleAccountGenerationComplete(accountData.id)
+        } catch (autoAssignError: any) {
+          console.warn(`⚠️ 自动分配失败: ${autoAssignError.message}`)
+        }
+        
         // 通知前端账号列表已更新
         emitAccountUpdate()
       } catch (dbError: any) {
