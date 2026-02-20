@@ -23,6 +23,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+.kiro/
 
 # Lock files (optional, 根据团队需求决定)
 # package-lock.json

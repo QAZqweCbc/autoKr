@@ -43,6 +43,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+.kiro
 
 # PM2
 ecosystem.config.js

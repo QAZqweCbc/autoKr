@@ -8,9 +8,18 @@ import cors from 'cors'
 import { Server as SocketIOServer } from 'socket.io'
 import { createServer } from 'http'
 import path from 'path'
+import { createProxyMiddleware } from 'http-proxy-middleware'
 import { initDatabase, closeDatabase } from './services/database.adapter'
 import { initWebSocket } from './websocket/socket.handler'
 import apiRoutes from './routes'
+import { logger, requestLogger } from './utils/logger'
+import { apiLimiter } from './middleware/rate-limiter'
+import { 
+  healthCheckHandler, 
+  simpleHealthCheck, 
+  metricsHandler,
+  monitoringMiddleware 
+} from './middleware/health-check'
 
 const app = express()
 const httpServer = createServer(app)
@@ -27,17 +36,73 @@ const io = new SocketIOServer(httpServer, {
 
 const PORT = process.env.PORT || 3000
 
+// 将 io 实例挂载到 app，供健康检查使用
+;(app as any).io = io
+
 // 中间件
 app.use(cors())
 app.use(express.json())
 
-// 日志中间件
-app.use((req, _res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`)
-  next()
-})
+// 监控中间件（记录请求指标）
+app.use(monitoringMiddleware)
 
-// API 路由（优先级最高）
+// 统一日志中间件
+app.use(requestLogger)
+
+// 健康检查端点（不需要限流）
+app.get('/health', healthCheckHandler)
+app.get('/health-basic', simpleHealthCheck)
+app.get('/metrics', metricsHandler)
+
+// API 限流（应用到所有 API 路由）
+app.use('/api', apiLimiter)
+
+// 代理认证服务的请求到端口 2233
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:2233'
+
+logger.info(`🔗 配置认证服务代理: ${AUTH_SERVICE_URL}`)
+
+// 代理 /api/auth 路由到认证服务
+app.use('/api/auth', createProxyMiddleware({
+  target: AUTH_SERVICE_URL,
+  changeOrigin: true,
+  logLevel: 'debug',
+  onProxyReq: (proxyReq, req) => {
+    logger.info(`[Proxy Auth] ${req.method} ${req.path} -> ${AUTH_SERVICE_URL}${req.path}`)
+  },
+  onError: (err, req, res) => {
+    logger.error(`[Proxy Auth Error] ${req.method} ${req.path}:`, err.message)
+    ;(res as express.Response).status(502).json({
+      success: false,
+      error: {
+        code: 502,
+        message: '认证服务暂时不可用，请确保认证服务正在运行'
+      }
+    })
+  }
+}))
+
+// 代理 /api/tokens 路由到认证服务
+app.use('/api/tokens', createProxyMiddleware({
+  target: AUTH_SERVICE_URL,
+  changeOrigin: true,
+  logLevel: 'debug',
+  onProxyReq: (proxyReq, req) => {
+    logger.info(`[Proxy Tokens] ${req.method} ${req.path} -> ${AUTH_SERVICE_URL}${req.path}`)
+  },
+  onError: (err, req, res) => {
+    logger.error(`[Proxy Tokens Error] ${req.method} ${req.path}:`, err.message)
+    ;(res as express.Response).status(502).json({
+      success: false,
+      error: {
+        code: 502,
+        message: 'Token服务暂时不可用，请确保认证服务正在运行'
+      }
+    })
+  }
+}))
+
+// API 路由（其他路由）
 app.use('/api', apiRoutes)
 
 // 静态文件服务
@@ -52,78 +117,74 @@ app.get(/^\/(?!api).*/, (_req, res) => {
 // 启动服务器
 async function start() {
   try {
-    console.log('\n' + '='.repeat(60))
-    console.log('🚀 Kiro Account Manager Server - 启动中...')
-    console.log('='.repeat(60))
+    logger.info('='.repeat(60))
+    logger.info('🚀 Kiro Account Manager Server - 启动中...')
+    logger.info('='.repeat(60))
     
     // 初始化数据库
-    console.log('\n📦 初始化数据库...')
+    logger.info('📦 初始化数据库...')
     await initDatabase()
     
     // 初始化 WebSocket
-    console.log('\n🔌 初始化 WebSocket...')
+    logger.info('🔌 初始化 WebSocket...')
     initWebSocket(io)
-    console.log('✅ WebSocket 初始化完成')
+    logger.info('✅ WebSocket 初始化完成')
     
     // 启动自动刷新调度器（优化版）
-    console.log('\n🔄 启动 Token 自动刷新调度器（优化版）...')
+    logger.info('🔄 启动 Token 自动刷新调度器（优化版）...')
     const { startAutoRefreshScheduler } = await import('./services/auto-refresh-optimized.service')
     startAutoRefreshScheduler()
     
     // 启动 HTTP 服务器
     httpServer.listen(PORT, () => {
-      console.log('\n' + '='.repeat(60))
-      console.log('✅ 服务器启动成功！')
-      console.log('='.repeat(60))
-      console.log(`📡 HTTP 服务: http://0.0.0.0:${PORT}`)
-      console.log(`📊 管理面板: http://0.0.0.0:${PORT}`)
-      console.log(`🔌 WebSocket: ws://0.0.0.0:${PORT}`)
-      console.log('='.repeat(60))
-      console.log('\n📚 API 端点:')
-      console.log(`   GET  /api/health-basic    - 基础健康检查`)
-      console.log(`   GET  /api/health/refresh  - 刷新系统健康状态`)
-      console.log(`   POST /api/tasks           - 创建任务`)
-      console.log(`   GET  /api/tasks           - 获取任务列表`)
-      console.log(`   GET  /api/tasks/stats     - 任务统计`)
-      console.log(`   GET  /api/accounts        - 获取账号列表`)
-      console.log(`   POST /api/accounts/export - 导出账号`)
-      console.log(`   POST /api/accounts/:id/reset-error - 重置账号错误状态`)
-      console.log(`   POST /api/accounts/reset-errors    - 批量重置错误状态`)
-      console.log(`   GET  /api/refresh/logs    - 查询刷新日志`)
-      console.log(`   GET  /api/refresh/logs/recent - 获取最近刷新日志`)
-      console.log(`   GET  /api/refresh/logs/stats  - 刷新日志统计`)
-      console.log(`   POST /api/generator       - 生成账号`)
-      console.log('='.repeat(60))
-      console.log('\n💡 提示:')
-      console.log('   - 在浏览器中打开管理面板开始使用')
-      console.log('   - 按 Ctrl+C 停止服务器')
-      console.log('   - 查看 server/README.md 了解更多信息')
-      console.log('')
+      logger.info('='.repeat(60))
+      logger.info('✅ 服务器启动成功！')
+      logger.info('='.repeat(60))
+      logger.info(`📡 HTTP 服务: http://0.0.0.0:${PORT}`)
+      logger.info(`📊 管理面板: http://0.0.0.0:${PORT}`)
+      logger.info(`🔌 WebSocket: ws://0.0.0.0:${PORT}`)
+      logger.info(`🏥 健康检查: http://0.0.0.0:${PORT}/health`)
+      logger.info(`📈 监控指标: http://0.0.0.0:${PORT}/metrics`)
+      logger.info('='.repeat(60))
+      logger.info('📚 API 端点:')
+      logger.info(`   GET  /api/health-basic    - 基础健康检查`)
+      logger.info(`   GET  /api/health/refresh  - 刷新系统健康状态`)
+      logger.info(`   POST /api/tasks           - 创建任务`)
+      logger.info(`   GET  /api/tasks           - 获取任务列表`)
+      logger.info(`   GET  /api/tasks/stats     - 任务统计`)
+      logger.info(`   GET  /api/accounts        - 获取账号列表`)
+      logger.info(`   POST /api/accounts/export - 导出账号`)
+      logger.info(`   POST /api/accounts/:id/reset-error - 重置账号错误状态`)
+      logger.info(`   POST /api/accounts/reset-errors    - 批量重置错误状态`)
+      logger.info(`   GET  /api/refresh/logs    - 查询刷新日志`)
+      logger.info(`   GET  /api/refresh/logs/recent - 获取最近刷新日志`)
+      logger.info(`   GET  /api/refresh/logs/stats  - 刷新日志统计`)
+      logger.info(`   POST /api/generator       - 生成账号`)
+      logger.info('='.repeat(60))
+      logger.info('💡 提示:')
+      logger.info('   - 在浏览器中打开管理面板开始使用')
+      logger.info('   - 按 Ctrl+C 停止服务器')
+      logger.info('   - 查看 server/README.md 了解更多信息')
+      logger.info('')
     })
   } catch (error: any) {
-    console.error('\n' + '='.repeat(60))
-    console.error('❌ 服务器启动失败')
-    console.error('='.repeat(60))
-    console.error(`错误: ${error.message}`)
-    console.error('\n常见问题排查：')
-    console.error('\n1. 端口被占用')
-    console.error(`   lsof -i :${PORT}`)
-    console.error(`   PORT=8080 npm run server:start`)
-    console.error('\n2. 依赖未安装')
-    console.error('   npm install')
-    console.error('\n3. 数据库初始化失败')
-    console.error('   rm -rf server/data')
-    console.error('   mkdir -p server/data')
-    console.error('\n4. Playwright 未安装')
-    console.error('   npx playwright install chromium')
-    console.error('='.repeat(60) + '\n')
+    logger.error('='.repeat(60))
+    logger.error('❌ 服务器启动失败')
+    logger.error('='.repeat(60))
+    logger.error(`错误: ${error.message}`, { stack: error.stack })
+    logger.error('常见问题排查：')
+    logger.error(`1. 端口被占用: lsof -i :${PORT}`)
+    logger.error('2. 依赖未安装: npm install')
+    logger.error('3. 数据库初始化失败: 检查数据库配置')
+    logger.error('4. Playwright 未安装: npx playwright install chromium')
+    logger.error('='.repeat(60))
     process.exit(1)
   }
 }
 
 // 优雅关闭
 process.on('SIGINT', async () => {
-  console.log('\n\n正在关闭服务器...')
+  logger.info('正在关闭服务器...')
   
   // 停止自动刷新调度器
   const { stopAutoRefreshScheduler } = await import('./services/auto-refresh-optimized.service')
@@ -131,13 +192,13 @@ process.on('SIGINT', async () => {
   
   await closeDatabase()
   httpServer.close(() => {
-    console.log('✅ 服务器已关闭')
+    logger.info('✅ 服务器已关闭')
     process.exit(0)
   })
 })
 
 process.on('SIGTERM', async () => {
-  console.log('\n\n正在关闭服务器...')
+  logger.info('正在关闭服务器...')
   
   // 停止自动刷新调度器
   const { stopAutoRefreshScheduler } = await import('./services/auto-refresh-optimized.service')
@@ -145,7 +206,7 @@ process.on('SIGTERM', async () => {
   
   await closeDatabase()
   httpServer.close(() => {
-    console.log('✅ 服务器已关闭')
+    logger.info('✅ 服务器已关闭')
     process.exit(0)
   })
 })
