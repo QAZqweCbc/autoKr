@@ -26,12 +26,26 @@ export async function initRedis(config: RedisConfig) {
       port: config.port,
       password: config.password,
       db: config.db || 0,
+      // 连接保活配置
+      keepAlive: 30000, // 30秒发送一次保活包
+      connectTimeout: 10000, // 连接超时10秒
+      // 重连策略
       retryStrategy: (times) => {
-        if (times > 3) {
-          return null // 停止重试
+        if (times > 10) {
+          console.error('❌ Redis 重连失败次数过多，停止重试')
+          return null
         }
-        return Math.min(times * 200, 2000)
-      }
+        const delay = Math.min(times * 200, 2000)
+        console.log(`🔄 Redis 重连中... (第${times}次，${delay}ms后重试)`)
+        return delay
+      },
+      // 自动重连
+      enableReadyCheck: true,
+      autoResubscribe: true,
+      autoResendUnfulfilledCommands: true,
+      // 连接池配置
+      lazyConnect: false,
+      maxRetriesPerRequest: 3
     })
     
     // 测试连接
@@ -39,9 +53,25 @@ export async function initRedis(config: RedisConfig) {
     
     console.log('✅ Redis 连接成功')
     
-    // 监听错误
+    // 监听连接事件
     redis.on('error', (err) => {
       console.error('❌ Redis 错误:', err.message)
+    })
+    
+    redis.on('close', () => {
+      console.warn('⚠️  Redis 连接已关闭')
+    })
+    
+    redis.on('reconnecting', () => {
+      console.log('🔄 Redis 正在重连...')
+    })
+    
+    redis.on('connect', () => {
+      console.log('✅ Redis 已连接')
+    })
+    
+    redis.on('ready', () => {
+      console.log('✅ Redis 已就绪')
     })
     
     return true

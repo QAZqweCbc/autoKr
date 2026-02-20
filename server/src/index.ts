@@ -66,19 +66,20 @@ logger.info(`🔗 配置认证服务代理: ${AUTH_SERVICE_URL}`)
 app.use('/api/auth', createProxyMiddleware({
   target: AUTH_SERVICE_URL,
   changeOrigin: true,
-  logLevel: 'debug',
-  onProxyReq: (proxyReq, req) => {
-    logger.info(`[Proxy Auth] ${req.method} ${req.path} -> ${AUTH_SERVICE_URL}${req.path}`)
-  },
-  onError: (err, req, res) => {
-    logger.error(`[Proxy Auth Error] ${req.method} ${req.path}:`, err.message)
-    ;(res as express.Response).status(502).json({
-      success: false,
-      error: {
-        code: 502,
-        message: '认证服务暂时不可用，请确保认证服务正在运行'
-      }
-    })
+  on: {
+    proxyReq: (proxyReq, req) => {
+      logger.info(`[Proxy Auth] ${req.method} ${req.url} -> ${AUTH_SERVICE_URL}${req.url}`)
+    },
+    error: (err, req, res) => {
+      logger.error(`[Proxy Auth Error] ${req.method} ${req.url}:`, err.message)
+      ;(res as express.Response).status(502).json({
+        success: false,
+        error: {
+          code: 502,
+          message: '认证服务暂时不可用，请确保认证服务正在运行'
+        }
+      })
+    }
   }
 }))
 
@@ -86,19 +87,20 @@ app.use('/api/auth', createProxyMiddleware({
 app.use('/api/tokens', createProxyMiddleware({
   target: AUTH_SERVICE_URL,
   changeOrigin: true,
-  logLevel: 'debug',
-  onProxyReq: (proxyReq, req) => {
-    logger.info(`[Proxy Tokens] ${req.method} ${req.path} -> ${AUTH_SERVICE_URL}${req.path}`)
-  },
-  onError: (err, req, res) => {
-    logger.error(`[Proxy Tokens Error] ${req.method} ${req.path}:`, err.message)
-    ;(res as express.Response).status(502).json({
-      success: false,
-      error: {
-        code: 502,
-        message: 'Token服务暂时不可用，请确保认证服务正在运行'
-      }
-    })
+  on: {
+    proxyReq: (proxyReq, req) => {
+      logger.info(`[Proxy Tokens] ${req.method} ${req.url} -> ${AUTH_SERVICE_URL}${req.url}`)
+    },
+    error: (err, req, res) => {
+      logger.error(`[Proxy Tokens Error] ${req.method} ${req.url}:`, err.message)
+      ;(res as express.Response).status(502).json({
+        success: false,
+        error: {
+          code: 502,
+          message: 'Token服务暂时不可用，请确保认证服务正在运行'
+        }
+      })
+    }
   }
 }))
 

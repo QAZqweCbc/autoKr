@@ -46,7 +46,15 @@ export async function initMySQL(config: MySQLConfig) {
       database: config.database,
       waitForConnections: true,
       connectionLimit: 10,
-      queueLimit: 0
+      queueLimit: 0,
+      // 连接保活配置
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 10000, // 10秒后开始保活
+      // 连接超时配置
+      connectTimeout: 10000, // 连接超时10秒
+      // 空闲连接回收配置
+      idleTimeout: 60000, // 空闲60秒后回收
+      maxIdle: 10 // 最大空闲连接数
     })
     
     // 测试连接
