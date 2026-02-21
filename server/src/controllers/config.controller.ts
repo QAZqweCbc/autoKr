@@ -143,6 +143,16 @@ export async function updateEmailConfig(req: Request, res: Response) {
       }
     }
     
+    // 自动将QQ邮箱配置转换为SMTP配置（用于发送验证码邮件）
+    if (emailConfig.qqEmail && emailConfig.authCode) {
+      emailConfig.smtpHost = 'smtp.qq.com'
+      emailConfig.smtpPort = 587
+      emailConfig.smtpSecure = false
+      emailConfig.smtpUser = emailConfig.qqEmail
+      emailConfig.smtpPassword = emailConfig.authCode
+      emailConfig.smtpFrom = `"Kiro Account System" <${emailConfig.qqEmail}>`
+    }
+    
     // 保存配置（自动加密敏感信息）
     await saveEmailConfigToStorage(emailConfig)
     
