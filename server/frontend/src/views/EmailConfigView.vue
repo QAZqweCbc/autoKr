@@ -38,7 +38,7 @@
         <el-form-item label="邮箱域名">
           <el-input
             v-model="form.domains"
-            placeholder="@xinc.shop,@qqximi.store,@kasxi.site"
+            placeholder="@example.com,@yourdomain.com"
             style="max-width: 600px;"
           />
           <div style="color: #6b7280; font-size: 13px; margin-top: 8px;">
@@ -194,7 +194,7 @@ const emailConfigStore = useEmailConfigStore()
 const form = ref({
   qqEmail: '',
   authCode: '',
-  domains: '@xinc.shop,@qqximi.store,@kasxi.site',
+  domains: '',
   useAlias: false,
   aliasType: 'gmail' as 'gmail' | 'qq',
   gmailBase: '',
