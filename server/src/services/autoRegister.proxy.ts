@@ -81,4 +81,13 @@ export type AutoRegisterAWSFunction = (
   proxyUrl?: string,
   receiveEmail?: string,
   browserConfig?: any
-) => Promise<{ success: boolean; ssoToken?: string; name?: string; error?: string }>
+) => Promise<{ 
+  success: boolean
+  ssoToken?: string
+  name?: string
+  error?: string
+  accessToken?: string
+  refreshToken?: string
+  clientId?: string
+  clientSecret?: string
+}>

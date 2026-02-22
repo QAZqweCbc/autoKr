@@ -166,11 +166,22 @@ async function executeTask(task: Task) {
       console.log(`✅ 注册成功 [${task.email}]`)
       console.log(`  SSO Token: ${result.ssoToken?.substring(0, 20)}...`)
       console.log(`  姓名: ${result.name}`)
+      
+      // 检查是否获取到完整的 OAuth 凭证
+      if (result.accessToken && result.refreshToken && result.clientId) {
+        console.log(`  ✅ 获取到完整 OAuth 凭证`)
+        console.log(`  - Access Token: ${result.accessToken.substring(0, 20)}...`)
+        console.log(`  - Refresh Token: ${result.refreshToken.substring(0, 20)}...`)
+        console.log(`  - Client ID: ${result.clientId.substring(0, 30)}...`)
+      } else {
+        console.log(`  ⚠️ 缺少 OAuth 凭证，账号将无法自动刷新`)
+      }
+      
       log('✅ 注册成功！')
       
       // 保存账号
       try {
-        // 准备基本账号数据
+        // 准备基本账号数据 - 正确映射字段到 credentials 对象
         const baseAccountData: Account = {
           id: uuidv4(),
           email: task.email,
@@ -180,10 +191,12 @@ async function executeTask(task: Task) {
           userId: undefined,
           visitorId: undefined,
           credentials: {
-            accessToken: result.ssoToken || '',
-            refreshToken: task.auth_code,
-            clientId: task.client_id,
-            clientSecret: '',
+            // ✅ 正确的字段映射
+            accessToken: result.accessToken || '',           // OAuth Access Token
+            ssoToken: result.ssoToken || '',                 // SSO Token (x-amz-sso_authn)
+            refreshToken: result.refreshToken || '',         // OAuth Refresh Token
+            clientId: result.clientId || '',                 // OAuth Client ID
+            clientSecret: result.clientSecret || '',         // OAuth Client Secret
             region: 'us-east-1'
           },
           subscription: {

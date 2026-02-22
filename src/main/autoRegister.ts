@@ -1407,7 +1407,16 @@ export async function autoRegisterAWS(
     delayMin?: number  // Minimum delay in seconds (default: 3)
     delayMax?: number  // Maximum delay in seconds (default: 8)
   }
-): Promise<{ success: boolean; ssoToken?: string; name?: string; error?: string }> {
+): Promise<{ 
+  success: boolean
+  ssoToken?: string
+  name?: string
+  error?: string
+  accessToken?: string
+  refreshToken?: string
+  clientId?: string
+  clientSecret?: string
+}> {
   const randomName = generateRandomName()
   let browser: Browser | null = null
   
@@ -2118,8 +2127,11 @@ export async function autoRegisterAWS(
       throw new Error('未能获取 SSO Token，可能操作未完成')
     }
     
-    // 步骤6: 等待并点击 "Confirm and continue" 按钮（授权确认页面）
-    log('\n步骤6: 等待授权确认页面...')
+    // 步骤6: 授权确认页面 - 两个步骤
+    log('\n步骤6: 授权确认页面（两个步骤）...')
+    
+    // 步骤6.1: 点击第一个 "Confirm and continue" 按钮
+    log('  6.1: 查找并点击 "Confirm and continue" 按钮...')
     const confirmButtonSelectors = [
       'button:has-text("Confirm and continue")',
       'button:has-text("确认并继续")',
@@ -2128,7 +2140,7 @@ export async function autoRegisterAWS(
       'button[type="submit"]:has-text("Confirm")'
     ]
     
-    let confirmClicked = false
+    let firstButtonClicked = false
     for (const selector of confirmButtonSelectors) {
       try {
         const confirmButton = page.locator(selector).first()
@@ -2137,105 +2149,282 @@ export async function autoRegisterAWS(
         // 🔒 并发安全检查：验证页面显示的代码与获取的 userCode 一致
         const pageContent = await page.content()
         
-        // 提取页面上显示的授权码 - 改进正则表达式，只匹配大写字母和数字
+        // 提取页面上显示的授权码
         const codeMatch = pageContent.match(/\b([A-Z]{4}-[A-Z]{4})\b/)
         const displayedCode = codeMatch ? codeMatch[1] : null
         
         if (displayedCode) {
-          log(`页面显示的授权码: ${displayedCode}`)
-          log(`我们获取的授权码: ${userCode}`)
+          log(`  页面显示的授权码: ${displayedCode}`)
+          log(`  我们获取的授权码: ${userCode}`)
           
-          // 断言检查：确保代码一致
           if (displayedCode.toUpperCase() !== userCode.toUpperCase()) {
-            log(`⚠ 授权码不匹配，但可能是页面解析问题，继续尝试点击`)
-            // 不再抛出异常，只记录警告
+            log(`  ⚠ 授权码不匹配，但可能是页面解析问题，继续尝试点击`)
           } else {
-            log(`✓ 并发安全检查通过：授权码一致 (${userCode})`)
+            log(`  ✓ 并发安全检查通过：授权码一致`)
           }
-        } else {
-          log('⚠ 未能从页面提取授权码，跳过验证')
         }
         
         if (pageContent.includes('Authorization requested')) {
-          log('✓ 检测到授权确认页面')
+          log('  ✓ 检测到授权确认页面')
         }
         
-        await randomDelay(2, 4, log, '发现确认按钮，等待后点击', configuredDelayMin, configuredDelayMax)
+        await randomDelay(2, 4, log, '  发现第一个确认按钮，等待后点击', configuredDelayMin, configuredDelayMax)
         await confirmButton.click()
-        log('✓ 已点击 Confirm and continue 按钮')
-        confirmClicked = true
+        log('  ✓ 已点击第一个 "Confirm and continue" 按钮')
+        firstButtonClicked = true
         break
       } catch {
         continue
       }
     }
     
-    if (!confirmClicked) {
-      log('⚠ 未找到 Confirm and continue 按钮，尝试查找 Allow access 按钮...')
+    if (!firstButtonClicked) {
+      log('  ⚠ 未找到第一个 "Confirm and continue" 按钮')
+    } else {
+      // 等待页面跳转到第二步
+      await randomDelay(3, 5, log, '  等待页面跳转到第二步', configuredDelayMin, configuredDelayMax)
+    }
+    
+    // 步骤6.2: 点击第二个 "Allow access" 按钮（最终授权）
+    log('  6.2: 查找并点击 "Allow access" 按钮（最终授权）...')
+    
+    // 打印当前页面信息用于调试
+    try {
+      const currentUrl = page.url()
+      const pageTitle = await page.title()
+      log(`  当前页面 URL: ${currentUrl}`)
+      log(`  当前页面标题: ${pageTitle}`)
       
-      // 打印当前页面信息用于调试
+      // 保存页面截图用于调试
       try {
-        const currentUrl = page.url()
-        const pageTitle = await page.title()
-        log(`当前页面 URL: ${currentUrl}`)
-        log(`当前页面标题: ${pageTitle}`)
-        
-        // 查找所有可见的按钮
-        const allButtons = await page.locator('button:visible, input[type="submit"]:visible').all()
-        log(`页面上共有 ${allButtons.length} 个可见按钮`)
-        
-        for (let i = 0; i < Math.min(allButtons.length, 5); i++) {
-          const buttonText = await allButtons[i].textContent().catch(() => '')
-          const buttonType = await allButtons[i].getAttribute('type').catch(() => '')
-          const buttonValue = await allButtons[i].getAttribute('value').catch(() => '')
-          log(`  按钮 ${i + 1}: text="${buttonText?.trim()}" type="${buttonType}" value="${buttonValue}"`)
-        }
+        const screenshotPath = `debug-allow-access-${Date.now()}.png`
+        await page.screenshot({ path: screenshotPath, fullPage: true })
+        log(`  📸 已保存截图: ${screenshotPath}`)
       } catch (e) {
-        log('⚠ 无法获取页面调试信息')
+        log(`  ⚠️ 截图失败: ${e}`)
       }
       
-      // 如果没找到 Confirm 按钮，尝试 Allow access 按钮（Kiro 授权页面）
-      const allowButtonSelectors = [
-        'button:has-text("Allow access")',
-        'button:has-text("允许访问")',
-        'button:has-text("Allow")',
-        'button:has-text("允许")',
-        'button[data-testid="test-primary-button"]:has-text("Allow")',
-        'input[type="submit"][value="Allow access"]',
-        // 添加更通用的选择器
-        'button[type="submit"]',
-        'input[type="submit"]',
-        'button.primary',
-        'button.btn-primary'
-      ]
+      // 查找所有可见的按钮
+      const allButtons = await page.locator('button:visible, input[type="submit"]:visible').all()
+      log(`  页面上共有 ${allButtons.length} 个可见按钮`)
       
-      for (const selector of allowButtonSelectors) {
-        try {
-          const allowButton = page.locator(selector).first()
-          await allowButton.waitFor({ state: 'visible', timeout: 15000 })
+      for (let i = 0; i < Math.min(allButtons.length, 10); i++) {
+        const buttonText = await allButtons[i].textContent().catch(() => '')
+        const buttonType = await allButtons[i].getAttribute('type').catch(() => '')
+        const buttonValue = await allButtons[i].getAttribute('value').catch(() => '')
+        const buttonClass = await allButtons[i].getAttribute('class').catch(() => '')
+        log(`  按钮 ${i + 1}: text="${buttonText?.trim()}" type="${buttonType}" value="${buttonValue}" class="${buttonClass}"`)
+      }
+    } catch (e) {
+      log('  ⚠ 无法获取页面调试信息')
+    }
+    
+    // 尝试多种选择器查找 Allow access 按钮
+    // 根据截图，这是一个橙色按钮，文本为 "Allow access"
+    const allowButtonSelectors = [
+      // 最精确的选择器 - 直接匹配文本
+      'button:has-text("Allow access")',
+      'button:text("Allow access")',
+      'button:text-is("Allow access")',
+      
+      // 通过 role 和文本
+      '[role="button"]:has-text("Allow access")',
+      
+      // 输入类型
+      'input[type="submit"][value="Allow access"]',
+      'input[value="Allow access"]',
+      
+      // 包含 Allow 的按钮
+      'button:has-text("Allow")',
+      'button:text("Allow")',
+      
+      // AWS UI 特定样式
+      'button[class*="awsui"]',
+      'button.awsui-button',
+      'button.awsui-button-variant-primary',
+      
+      // 通用主按钮样式
+      'button[class*="primary"]',
+      'button.btn-primary',
+      'button.primary',
+      
+      // 最后的兜底选择器 - 任何提交按钮
+      'button[type="submit"]',
+      'input[type="submit"]'
+    ]
+    
+    let secondButtonClicked = false
+    
+    // 先等待页面完全加载
+    try {
+      await page.waitForLoadState('networkidle', { timeout: 10000 })
+      log('  ✓ 页面网络已空闲')
+    } catch {
+      log('  ⚠ 页面网络未完全空闲，继续尝试')
+    }
+    
+    // 额外等待确保页面渲染完成
+    await page.waitForTimeout(3000)
+    
+    for (const selector of allowButtonSelectors) {
+      try {
+        log(`  尝试选择器: ${selector}`)
+        const allowButton = page.locator(selector).first()
+        
+        // 等待按钮出现
+        await allowButton.waitFor({ state: 'visible', timeout: 20000 })
+        
+        // 检查按钮文本
+        const buttonText = await allowButton.textContent().catch(() => '')
+        log(`  找到按钮，文本: "${buttonText?.trim()}"`)
+        
+        // 检查是否是正确的按钮
+        // 必须包含 "Allow" 或 "允许"，且不能是 "Deny"
+        if (buttonText) {
+          const text = buttonText.trim().toLowerCase()
+          const isAllowButton = (text.includes('allow') || text.includes('允许')) && !text.includes('deny')
           
-          // 检查是否是 Kiro 授权页面
-          const pageContent = await page.content()
-          if (pageContent.includes('Allow AWS Builder ID Registration to access your data') || 
-              pageContent.includes('Kiro')) {
-            log('✓ 检测到 Kiro 授权页面')
+          if (isAllowButton || selector.includes('primary') || selector.includes('submit')) {
+            log(`  ✓ 确认这是正确的按钮`)
+            
+            // 确保按钮可点击
+            await allowButton.waitFor({ state: 'attached', timeout: 5000 })
+            
+            // 滚动到按钮位置
+            try {
+              await allowButton.scrollIntoViewIfNeeded()
+              log('  ✓ 已滚动到按钮位置')
+            } catch {
+              log('  ⚠ 滚动失败，继续尝试点击')
+            }
+            
+            await randomDelay(2, 4, log, '  发现第二个授权按钮，等待后点击', configuredDelayMin, configuredDelayMax)
+            
+            // 尝试多种点击方式
+            try {
+              // 方式1: 普通点击
+              await allowButton.click({ timeout: 10000 })
+              log('  ✓ 已点击第二个 "Allow access" 按钮（普通点击）')
+              secondButtonClicked = true
+              break
+            } catch (e1) {
+              log(`  ⚠ 普通点击失败: ${e1}`)
+              
+              try {
+                // 方式2: 强制点击
+                await allowButton.click({ force: true, timeout: 10000 })
+                log('  ✓ 已点击第二个 "Allow access" 按钮（强制点击）')
+                secondButtonClicked = true
+                break
+              } catch (e2) {
+                log(`  ⚠ 强制点击失败: ${e2}`)
+                
+                try {
+                  // 方式3: JavaScript 点击
+                  await allowButton.evaluate((el: any) => el.click())
+                  log('  ✓ 已点击第二个 "Allow access" 按钮（JS点击）')
+                  secondButtonClicked = true
+                  break
+                } catch (e3) {
+                  log(`  ⚠ JS点击失败: ${e3}`)
+                }
+              }
+            }
+          } else {
+            log(`  ⚠ 按钮文本不匹配，跳过: "${text}"`)
           }
-          
-          await randomDelay(3, 6, log, '发现 Allow access 按钮，等待后点击', configuredDelayMin, configuredDelayMax)
-          await allowButton.click()
-          log('✓ 已点击 Allow access 按钮')
-          confirmClicked = true
-          break
-        } catch {
-          continue
         }
+      } catch (e) {
+        log(`  ✗ 选择器失败: ${e}`)
+        continue
       }
     }
     
-    if (!confirmClicked) {
-      log('⚠ 未找到授权按钮，可能已自动授权或页面已跳转')
+    if (!secondButtonClicked) {
+      log('  ⚠️ 所有选择器都失败，尝试最后的兜底方案...')
+      
+      try {
+        // 方案1: 通过页面内容查找包含 "Allow access" 的元素
+        log('  尝试通过页面内容查找...')
+        const pageContent = await page.content()
+        
+        if (pageContent.includes('Allow access')) {
+          log('  ✓ 页面包含 "Allow access" 文本')
+          
+          // 尝试使用 XPath
+          try {
+            const xpathButton = page.locator('xpath=//button[contains(text(), "Allow access")]').first()
+            await xpathButton.waitFor({ state: 'visible', timeout: 5000 })
+            await xpathButton.click()
+            log('  ✓ 通过 XPath 点击成功')
+            secondButtonClicked = true
+          } catch (e) {
+            log(`  ⚠ XPath 点击失败: ${e}`)
+          }
+        }
+        
+        // 方案2: 查找所有按钮，手动过滤
+        if (!secondButtonClicked) {
+          log('  尝试查找所有按钮并手动过滤...')
+          const allButtons = await page.locator('button, input[type="submit"]').all()
+          
+          for (let i = 0; i < allButtons.length; i++) {
+            try {
+              const btn = allButtons[i]
+              const isVisible = await btn.isVisible()
+              
+              if (isVisible) {
+                const text = await btn.textContent().catch(() => '')
+                const value = await btn.getAttribute('value').catch(() => '')
+                
+                if ((text && text.includes('Allow access')) || (value && value.includes('Allow access'))) {
+                  log(`  ✓ 找到目标按钮 (索引 ${i})`)
+                  await btn.click()
+                  log('  ✓ 手动过滤点击成功')
+                  secondButtonClicked = true
+                  break
+                }
+              }
+            } catch (e) {
+              continue
+            }
+          }
+        }
+        
+        // 方案3: 使用 evaluate 在浏览器中执行查找和点击
+        if (!secondButtonClicked) {
+          log('  尝试在浏览器中直接执行点击...')
+          const clicked = await page.evaluate(() => {
+            // 查找所有按钮
+            const buttons = Array.from(document.querySelectorAll('button, input[type="submit"]'))
+            
+            for (const btn of buttons) {
+              const text = btn.textContent || (btn as HTMLInputElement).value || ''
+              if (text.includes('Allow access')) {
+                (btn as HTMLElement).click()
+                return true
+              }
+            }
+            return false
+          })
+          
+          if (clicked) {
+            log('  ✓ 浏览器内点击成功')
+            secondButtonClicked = true
+          } else {
+            log('  ⚠ 浏览器内未找到按钮')
+          }
+        }
+      } catch (e) {
+        log(`  ⚠ 兜底方案失败: ${e}`)
+      }
+    }
+    
+    if (!secondButtonClicked) {
+      log('  ⚠️ 未找到第二个 "Allow access" 按钮')
+      log('  这可能导致授权未完成，OAuth 凭证无法获取')
     } else {
-      await randomDelay(3, 5, log, '点击授权按钮后等待', configuredDelayMin, configuredDelayMax)
+      await randomDelay(3, 5, log, '  点击第二个授权按钮后等待', configuredDelayMin, configuredDelayMax)
     }
     
     // 步骤7: 等待最终确认页面或成功页面
@@ -2267,12 +2456,98 @@ export async function autoRegisterAWS(
     // 等待一段时间确保所有操作完成
     await randomDelay(2, 4, log, '最终等待', configuredDelayMin, configuredDelayMax)
     
+    // 步骤8: 尝试通过 API 获取完整的 OAuth 凭证
+    log('\n步骤8: 尝试获取完整的 OAuth 凭证...')
+    
+    let oauthCredentials: {
+      accessToken?: string
+      refreshToken?: string
+      clientId?: string
+      clientSecret?: string
+    } = {
+      clientId: regData.clientId,
+      clientSecret: regData.clientSecret
+    }
+    
+    // 如果第二个授权按钮点击成功，尝试轮询获取 token
+    if (secondButtonClicked) {
+      try {
+        log('  正在轮询获取 OAuth Token...')
+        const oidcBase = `https://oidc.us-east-1.amazonaws.com`
+        const startTime = Date.now()
+        const timeout = 60000 // 1 分钟超时
+        let interval = 1
+        
+        while (Date.now() - startTime < timeout) {
+          await new Promise(r => setTimeout(r, interval * 1000))
+          
+          const tokenRes = await fetch(`${oidcBase}/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              clientId: regData.clientId,
+              clientSecret: regData.clientSecret,
+              grantType: 'urn:ietf:params:oauth:grant-type:device_code',
+              deviceCode: devData.deviceCode
+            })
+          })
+          
+          if (tokenRes.ok) {
+            const tokenData = await tokenRes.json() as { 
+              accessToken: string
+              refreshToken: string
+              expiresIn?: number 
+            }
+            
+            oauthCredentials.accessToken = tokenData.accessToken
+            oauthCredentials.refreshToken = tokenData.refreshToken
+            
+            log('  ✓ OAuth Token 获取成功!')
+            log(`  - Access Token: ${tokenData.accessToken.substring(0, 20)}...`)
+            log(`  - Refresh Token: ${tokenData.refreshToken.substring(0, 20)}...`)
+            break
+          }
+          
+          if (tokenRes.status === 400) {
+            const errData = await tokenRes.json() as { error?: string }
+            if (errData.error === 'authorization_pending') {
+              log(`  ⏳ 等待授权完成... (${Math.floor((Date.now() - startTime) / 1000)}s)`)
+              continue
+            } else if (errData.error === 'slow_down') {
+              interval += 5
+              continue
+            } else {
+              log(`  ⚠ Token 获取失败: ${errData.error}`)
+              break
+            }
+          }
+        }
+        
+        if (!oauthCredentials.accessToken) {
+          log('  ⚠ OAuth Token 获取超时')
+        }
+      } catch (error) {
+        log(`  ⚠ OAuth Token 获取异常: ${error}`)
+      }
+    } else {
+      log('  ⚠ 第二个授权按钮未点击成功，跳过 OAuth Token 获取')
+    }
+    
     // 关闭浏览器
     await browser.close()
     browser = null
     
     log('\n========== 操作成功! ==========')
-    return { success: true, ssoToken, name: randomName }
+    return { 
+      success: true, 
+      ssoToken, 
+      name: randomName,
+      // 返回 OAuth 凭证（如果获取到）
+      accessToken: oauthCredentials.accessToken,
+      refreshToken: oauthCredentials.refreshToken,
+      clientId: oauthCredentials.clientId,
+      clientSecret: oauthCredentials.clientSecret
+    }
     
   } catch (error) {
     log(`\n✗ 注册失败: ${error}`)
