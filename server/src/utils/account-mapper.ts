@@ -293,7 +293,7 @@ export function updateAccountUsage(account: Account, syncData: any): Account {
       resourceDetail: {
         resourceType: syncData.resource_type || account.usage.resourceDetail?.resourceType,
         displayName: syncData.resource_display_name || account.usage.resourceDetail?.displayName,
-        displayNamePlural: account.usage.resourceDetail?.displayNamePlural,
+        displayNamePlural: syncData.resource_display_name_plural || account.usage.resourceDetail?.displayNamePlural,
         currency: syncData.resource_currency || account.usage.resourceDetail?.currency,
         unit: syncData.resource_unit || account.usage.resourceDetail?.unit,
         overageRate: syncData.overage_rate ?? account.usage.resourceDetail?.overageRate,

@@ -44,18 +44,32 @@ api.interceptors.request.use(
   }
 )
 
-// Add response interceptor for logging (development only)
-if (import.meta.env.DEV) {
-  api.interceptors.response.use(
-    (response) => {
+// Add response interceptor for error handling
+api.interceptors.response.use(
+  (response) => {
+    if (import.meta.env.DEV) {
       console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url}`, response.data)
-      return response
-    },
-    (error) => {
-      console.error('[API Response Error]', error)
-      return Promise.reject(error)
     }
-  )
-}
+    return response
+  },
+  (error) => {
+    if (import.meta.env.DEV) {
+      console.error('[API Response Error]', error)
+    }
+    
+    // Handle 401 Unauthorized - clear token and redirect to login
+    if (error.response?.status === 401) {
+      console.warn('[Auth] Token expired or invalid, clearing localStorage')
+      localStorage.removeItem('admin_token')
+      
+      // Redirect to login page if not already there
+      if (!window.location.pathname.includes('/admin/login')) {
+        window.location.href = '/admin/login'
+      }
+    }
+    
+    return Promise.reject(error)
+  }
+)
 
 export default api

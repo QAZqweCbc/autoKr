@@ -92,6 +92,7 @@ export async function kiroApiRequest<T>(
 export interface UserInfoResponse {
   email?: string
   userId?: string
+  nickname?: string
   idp?: string
   status?: string
   featureFlags?: string[]
@@ -177,6 +178,7 @@ export async function syncAccountUsage(
   data?: {
     // 用户信息
     user_id?: string
+    nickname?: string
     idp?: string
     
     // 订阅信息
@@ -202,6 +204,7 @@ export async function syncAccountUsage(
     
     // 资源详情
     resource_display_name?: string
+    resource_display_name_plural?: string
     resource_type?: string
     resource_currency?: string
     resource_unit?: string
@@ -250,6 +253,7 @@ export async function syncAccountUsage(
       data: {
         // 用户信息
         user_id: userInfo?.userId || usageInfo.userInfo?.userId,
+        nickname: userInfo?.email?.split('@')[0], // 从邮箱提取昵称
         idp: userInfo?.idp || idp,
         
         // 订阅信息
@@ -279,6 +283,7 @@ export async function syncAccountUsage(
         
         // 资源详情
         resource_display_name: usageBreakdown?.displayName,
+        resource_display_name_plural: usageBreakdown?.displayNamePlural,
         resource_type: usageBreakdown?.resourceType,
         resource_currency: usageBreakdown?.currency,
         resource_unit: usageBreakdown?.unit,

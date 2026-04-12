@@ -78,6 +78,10 @@ export async function initMySQL(config: MySQLConfig) {
     // 创建刷新日志表
     await createRefreshLogsTable()
     
+    // 创建注册日志表
+    const { createRegistrationLogTable } = await import('./registration-log.service')
+    await createRegistrationLogTable()
+    
     // 运行数据库迁移
     const { migrateAddRevokeReason } = await import('../migrations/add-revoke-reason')
     await migrateAddRevokeReason()

@@ -11,6 +11,7 @@ import { emitTaskUpdate, emitTaskLog, emitAccountUpdate } from '../websocket/soc
 import { loadBrowserConfig, applyLinuxOptimizations, getEnvironmentInfo } from './config.service'
 import { getEmailConfigForInternal } from './email-config-manager.service'
 import { syncAccountUsage } from './kiro-api.service'
+import { logRegistration, RegistrationLog } from './registration-log.service'
 
 // 当前正在执行的任务数
 let runningTasks = 0
@@ -68,6 +69,7 @@ export async function startRegisterTask(task: Task) {
  */
 async function executeTask(task: Task) {
   runningTasks++
+  const startTime = Date.now()  // 记录开始时间
   
   try {
     console.log(`\n${'='.repeat(60)}`)
@@ -163,7 +165,8 @@ async function executeTask(task: Task) {
     
     if (result.success) {
       // 注册成功
-      console.log(`✅ 注册成功 [${task.email}]`)
+      const duration = Date.now() - startTime
+      console.log(`✅ 注册成功 [${task.email}] (耗时: ${duration}ms)`)
       console.log(`  SSO Token: ${result.ssoToken?.substring(0, 20)}...`)
       console.log(`  姓名: ${result.name}`)
       
@@ -178,6 +181,7 @@ async function executeTask(task: Task) {
       }
       
       log('✅ 注册成功！')
+      log(`⏱️ 耗时: ${(duration / 1000).toFixed(2)}秒`)
       
       // 保存账号
       try {
@@ -235,6 +239,8 @@ async function executeTask(task: Task) {
         }
         
         let accountData = baseAccountData
+        let registrationLogData: Partial<RegistrationLog> = {}
+        
         if (syncResult.success && syncResult.data) {
           // 同步成功，使用映射工具更新账户信息
           log('✅ 账号信息同步成功')
@@ -243,8 +249,30 @@ async function executeTask(task: Task) {
           console.log(`  - 订阅类型: ${syncResult.data.subscription_title}`)
           console.log(`  - 使用量: ${syncResult.data.usage_current}/${syncResult.data.usage_limit}`)
           
+          // 在实时日志中显示详细信息
+          log(`📊 账号详情:`)
+          log(`  用户ID: ${syncResult.data.user_id}`)
+          log(`  昵称: ${syncResult.data.nickname || '未设置'}`)
+          log(`  订阅: ${syncResult.data.subscription_title} (${syncResult.data.subscription_status})`)
+          log(`  剩余天数: ${syncResult.data.days_remaining || 0}天`)
+          log(`  使用量: ${syncResult.data.usage_current}/${syncResult.data.usage_limit} (${syncResult.data.usage_percent}%)`)
+          
           const { updateAccountUsage } = await import('../utils/account-mapper')
           accountData = updateAccountUsage(baseAccountData, syncResult.data)
+          
+          // 保存到注册日志
+          registrationLogData = {
+            user_id: syncResult.data.user_id,
+            nickname: syncResult.data.nickname,
+            subscription_type: syncResult.data.subscription_type,
+            subscription_title: syncResult.data.subscription_title,
+            subscription_status: syncResult.data.subscription_status,
+            days_remaining: syncResult.data.days_remaining,
+            expires_at: syncResult.data.expires_at,
+            usage_current: syncResult.data.usage_current,
+            usage_limit: syncResult.data.usage_limit,
+            usage_percent: syncResult.data.usage_percent
+          }
         } else {
           // 同步失败，记录警告但继续保存基本信息
           log(`⚠️ 账号信息同步失败: ${syncResult.error || '未知错误'}`)
@@ -256,6 +284,35 @@ async function executeTask(task: Task) {
         await AccountDB.create(accountData)
         console.log(`💾 账号已保存到数据库`)
         log('💾 账号已保存')
+        
+        // 📝 记录注册日志到数据库
+        try {
+          const registrationLog: RegistrationLog = {
+            id: uuidv4(),
+            task_id: task.id,
+            email: task.email,
+            status: 'success',
+            sso_token: result.ssoToken,
+            access_token: result.accessToken,
+            refresh_token: result.refreshToken,
+            client_id: result.clientId,
+            client_secret: result.clientSecret,
+            region: 'us-east-1',
+            idp: 'BuilderId',
+            browser_type: optimizedConfig.browserType,
+            headless: optimizedConfig.headless,
+            proxy_url: task.proxy_url,
+            duration,
+            created_at: Date.now(),
+            ...registrationLogData
+          }
+          
+          await logRegistration(registrationLog)
+          console.log(`📝 注册日志已保存`)
+          log('📝 注册日志已记录')
+        } catch (logError: any) {
+          console.error(`⚠️ 保存注册日志失败:`, logError.message)
+        }
         
         // 触发自动分配给等待的用户
         try {
@@ -278,9 +335,32 @@ async function executeTask(task: Task) {
       
     } else {
       // 注册失败
+      const duration = Date.now() - startTime
       const error = result.error || '未知错误'
-      console.error(`❌ 注册失败 [${task.email}]: ${error}`)
+      console.error(`❌ 注册失败 [${task.email}]: ${error} (耗时: ${duration}ms)`)
       log(`❌ 注册失败: ${error}`)
+      log(`⏱️ 耗时: ${(duration / 1000).toFixed(2)}秒`)
+      
+      // 📝 记录失败日志
+      try {
+        const registrationLog: RegistrationLog = {
+          id: uuidv4(),
+          task_id: task.id,
+          email: task.email,
+          status: 'failed',
+          browser_type: optimizedConfig.browserType,
+          headless: optimizedConfig.headless,
+          proxy_url: task.proxy_url,
+          duration,
+          error_message: error,
+          created_at: Date.now()
+        }
+        
+        await logRegistration(registrationLog)
+        console.log(`📝 失败日志已保存`)
+      } catch (logError: any) {
+        console.error(`⚠️ 保存失败日志失败:`, logError.message)
+      }
       
       await TaskDB.updateStatus(task.id, 'failed', error)
       emitTaskUpdate(task.id, 'failed', error)
