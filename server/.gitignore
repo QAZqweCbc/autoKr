@@ -46,7 +46,7 @@ Thumbs.db
 .kiro
 
 # PM2
-ecosystem.config.js
+# ecosystem.config.js  # 允许提交PM2配置
 .pm2/
 
 # Test

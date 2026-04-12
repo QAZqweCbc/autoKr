@@ -25,11 +25,16 @@ import {
   emitRefreshAccount,
   emitRefreshComplete
 } from '../websocket/socket.handler'
+import { 
+  KIRO_AUTH_ENDPOINT, 
+  REFRESH_CONFIG, 
+  TIMEOUT_CONFIG 
+} from '../config/constants'
 
-// 常量配置
-const TOKEN_REFRESH_BEFORE_EXPIRY = 5 * 60 * 1000 // 过期前 5 分钟刷新
+// 常量配置（使用全局配置）
+const TOKEN_REFRESH_BEFORE_EXPIRY = REFRESH_CONFIG.TOKEN_EXPIRY_BUFFER
+const BATCH_DELAY = REFRESH_CONFIG.BATCH_DELAY
 const MAX_CONSECUTIVE_FAILURES = 3 // 最大连续失败次数
-const BATCH_DELAY = 200 // 批次间延迟（毫秒）
 
 let refreshTimer: NodeJS.Timeout | null = null
 let isRefreshing = false
@@ -620,7 +625,6 @@ async function refreshSingleAccount(account: Account): Promise<RefreshDetail> {
     if (authMethod === 'social') {
       // 社交登录：使用 Kiro API 刷新
       console.log(`  🔑 [Token] ${account.email} - 使用社交登录刷新`)
-      const KIRO_AUTH_ENDPOINT = 'https://prod.us-east-1.auth.desktop.kiro.dev'
 
       try {
         const response = await axios.post(

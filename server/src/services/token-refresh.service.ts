@@ -3,6 +3,7 @@
  */
 
 import axios from 'axios'
+import { KIRO_AUTH_ENDPOINT, TIMEOUT_CONFIG } from '../config/constants'
 
 export interface TokenRefreshResult {
   success: boolean
@@ -11,8 +12,6 @@ export interface TokenRefreshResult {
   expiresIn?: number
   error?: string
 }
-
-const KIRO_AUTH_ENDPOINT = 'https://prod.us-east-1.auth.desktop.kiro.dev'
 
 /**
  * 刷新 Token（根据 authMethod 自动选择刷新方式）
@@ -58,7 +57,7 @@ async function refreshSocialToken(refreshToken: string): Promise<TokenRefreshRes
         'Content-Type': 'application/json',
         'User-Agent': 'kiro-account-manager/1.0.0'
       },
-      timeout: 30000
+      timeout: TIMEOUT_CONFIG.TOKEN_REFRESH
     }
   )
   
@@ -100,7 +99,7 @@ async function refreshIdCToken(
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      timeout: 30000
+      timeout: TIMEOUT_CONFIG.TOKEN_REFRESH
     }
   )
   

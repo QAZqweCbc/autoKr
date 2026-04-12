@@ -4,7 +4,12 @@
 
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'kiro-secret-key-change-in-production'
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  console.error('❌ 错误: 未设置 JWT_SECRET 环境变量！')
+  console.error('💡 请在 .env 文件中设置 JWT_SECRET')
+  console.error('💡 生成方法: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"')
+  process.exit(1)
+})()
 const JWT_EXPIRES_IN = '7d'
 
 export interface JWTPayload {
