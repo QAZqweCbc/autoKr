@@ -46,15 +46,7 @@ export async function initMySQL(config: MySQLConfig) {
       database: config.database,
       waitForConnections: true,
       connectionLimit: 10,
-      queueLimit: 0,
-      // 连接保活配置
-      enableKeepAlive: true,
-      keepAliveInitialDelay: 10000, // 10秒后开始保活
-      // 连接超时配置
-      connectTimeout: 10000, // 连接超时10秒
-      // 空闲连接回收配置
-      idleTimeout: 60000, // 空闲60秒后回收
-      maxIdle: 10 // 最大空闲连接数
+      queueLimit: 0
     })
     
     // 测试连接
@@ -77,14 +69,6 @@ export async function initMySQL(config: MySQLConfig) {
     
     // 创建刷新日志表
     await createRefreshLogsTable()
-    
-    // 创建注册日志表
-    const { createRegistrationLogTable } = await import('./registration-log.service')
-    await createRegistrationLogTable()
-    
-    // 运行数据库迁移
-    const { migrateAddRevokeReason } = await import('../migrations/add-revoke-reason')
-    await migrateAddRevokeReason()
     
     return true
   } catch (error: any) {
@@ -157,6 +141,7 @@ async function createTables() {
     
     // 迁移：添加扩展字段（如果不存在）
     await migrateAccountsTable(connection)
+    await migrateCurrentAccountSchema(connection)
     
     // 创建检测记录表
     await connection.execute(`
@@ -324,6 +309,72 @@ async function migrateAccountsTable(connection: mysql.PoolConnection) {
 /**
  * 关闭 MySQL 连接
  */
+// 补齐当前账户读写逻辑依赖的新字段，并将旧列数据回填到新列。
+async function migrateCurrentAccountSchema(connection: mysql.PoolConnection) {
+  const fieldsToAdd = [
+    { name: 'csrf_token', definition: 'TEXT COMMENT "CSRF Token"' },
+    { name: 'auth_method', definition: 'VARCHAR(50) COMMENT "认证方式"' },
+    { name: 'provider', definition: 'VARCHAR(50) COMMENT "身份提供商"' },
+    { name: 'visitor_id', definition: 'VARCHAR(255) COMMENT "访问者ID"' },
+    { name: 'group_id', definition: 'VARCHAR(255) COMMENT "分组ID"' },
+    { name: 'tags', definition: 'TEXT COMMENT "标签(JSON)"' },
+    { name: 'is_active', definition: 'BOOLEAN COMMENT "是否激活"' },
+    { name: 'subscription_raw_type', definition: 'VARCHAR(100) COMMENT "原始订阅类型"' },
+    { name: 'subscription_expires_at', definition: 'BIGINT COMMENT "订阅过期时间戳"' },
+    { name: 'subscription_days_remaining', definition: 'INT COMMENT "订阅剩余天数"' },
+    { name: 'usage_percent_used', definition: 'DECIMAL(5,2) COMMENT "已使用百分比"' },
+    { name: 'usage_last_updated', definition: 'BIGINT COMMENT "使用量最后更新时间戳"' },
+    { name: 'usage_bonuses', definition: 'TEXT COMMENT "奖励额度(JSON)"' },
+    { name: 'resource_display_name_plural', definition: 'VARCHAR(100) COMMENT "资源显示名称复数"' }
+  ]
+
+  for (const field of fieldsToAdd) {
+    const [columns] = await connection.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'accounts'
+       AND COLUMN_NAME = ?`,
+      [field.name]
+    )
+
+    if ((columns as any[]).length === 0) {
+      await connection.execute(
+        `ALTER TABLE accounts ADD COLUMN ${field.name} ${field.definition}`
+      )
+      console.log(`Added current account column: accounts.${field.name}`)
+    }
+  }
+
+  const backfillStatements = [
+    `UPDATE accounts
+       SET access_token = COALESCE(access_token, x_amz_sso_authn)
+     WHERE access_token IS NULL OR access_token = ''`,
+    `UPDATE accounts
+       SET subscription_days_remaining = COALESCE(subscription_days_remaining, days_remaining)
+     WHERE subscription_days_remaining IS NULL`,
+    `UPDATE accounts
+       SET subscription_expires_at = COALESCE(subscription_expires_at, expires_at)
+     WHERE subscription_expires_at IS NULL`,
+    `UPDATE accounts
+       SET usage_percent_used = COALESCE(usage_percent_used, usage_percent)
+     WHERE usage_percent_used IS NULL`,
+    `UPDATE accounts
+       SET usage_last_updated = COALESCE(usage_last_updated, last_sync_at)
+     WHERE usage_last_updated IS NULL`,
+    `UPDATE accounts
+       SET last_checked_at = COALESCE(last_checked_at, last_sync_at)
+     WHERE last_checked_at IS NULL`
+  ]
+
+  for (const statement of backfillStatements) {
+    try {
+      await connection.execute(statement)
+    } catch (error) {
+      console.warn('Current account schema backfill failed:', error)
+    }
+  }
+}
+
 export async function closeMySQL() {
   if (pool) {
     await pool.end()

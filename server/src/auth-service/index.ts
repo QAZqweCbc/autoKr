@@ -2,17 +2,52 @@
  * 注册认证服务 - 独立服务（端口2233）
  */
 
+import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
-import { initDatabase } from '../services/database.adapter'
+import { initDatabase, forceJsonFallback, getStorageMode } from '../services/database.adapter'
 import authRoutes from './routes/auth.routes'
 import tokenRoutes from './routes/token.routes'
+import { validateEncryptionSetup } from '../utils/crypto.util'
+import { validateJwtSetup } from '../middleware/auth.middleware'
+
+// ============================================
+// 启动前验证：加密密钥和JWT密钥
+// ============================================
+validateEncryptionSetup()
+validateJwtSetup()
 
 const app = express()
 const PORT = process.env.AUTH_PORT || 2233
 
+// ============================================
+// CORS 配置
+// ============================================
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [
+  'http://localhost:1455',
+  'http://localhost:5173',  // Vite dev server
+  'http://127.0.0.1:1455',
+  'http://127.0.0.1:5173'
+]
+
+console.log('🔒 [Auth Service] CORS 允许的来源:', ALLOWED_ORIGINS)
+
 // 中间件
-app.use(cors())
+app.use(cors({
+  origin: (origin, callback) => {
+    // 允许无 origin 的请求（如 Postman、curl、服务器端请求）
+    if (!origin) return callback(null, true)
+    
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true)
+    } else {
+      console.warn('[Auth Service] CORS blocked origin:', origin)
+      callback(new Error(`来源 ${origin} 不在允许列表中`))
+    }
+  },
+  credentials: true,
+  maxAge: 86400
+}))
 app.use(express.json())
 
 // 日志中间件
@@ -79,7 +114,13 @@ async function start() {
     
     // 初始化数据库
     console.log('\n📦 初始化数据库...')
-    await initDatabase()
+    try {
+      await initDatabase()
+    } catch (error: any) {
+      forceJsonFallback(error?.message || '数据库初始化失败')
+      console.warn('⚠️  已降级到 JSON 存储模式继续启动')
+    }
+    console.log(`📦 当前存储模式: ${getStorageMode().toUpperCase()}`)
     
     // 启动HTTP服务器
     app.listen(PORT, () => {

@@ -6,6 +6,109 @@
 import * as path from 'path'
 import * as fs from 'fs'
 
+const DEBUG_IMAGE_DIR = path.resolve(__dirname, '../../logs/img')
+let screenshotPatchApplied = false
+
+function rewriteScreenshotOptions(options: any) {
+  if (!options || typeof options !== 'object' || typeof options.path !== 'string') {
+    return options
+  }
+
+  if (path.isAbsolute(options.path)) {
+    return options
+  }
+
+  fs.mkdirSync(DEBUG_IMAGE_DIR, { recursive: true })
+  return {
+    ...options,
+    path: path.join(DEBUG_IMAGE_DIR, path.basename(options.path))
+  }
+}
+
+function patchPage(page: any) {
+  if (!page || typeof page.screenshot !== 'function' || page.__kiroScreenshotPatched) {
+    return page
+  }
+
+  const originalScreenshot = page.screenshot
+  page.screenshot = function patchedScreenshot(options?: any) {
+    return originalScreenshot.call(this, rewriteScreenshotOptions(options))
+  }
+  page.__kiroScreenshotPatched = true
+  return page
+}
+
+function patchContext(context: any) {
+  if (!context || typeof context.newPage !== 'function' || context.__kiroNewPagePatched) {
+    return context
+  }
+
+  const originalNewPage = context.newPage
+  context.newPage = async function patchedNewPage(...args: any[]) {
+    const page = await originalNewPage.apply(this, args)
+    return patchPage(page)
+  }
+  context.__kiroNewPagePatched = true
+  return context
+}
+
+function patchBrowser(browser: any) {
+  if (!browser) {
+    return browser
+  }
+
+  if (typeof browser.newPage === 'function' && !browser.__kiroBrowserNewPagePatched) {
+    const originalNewPage = browser.newPage
+    browser.newPage = async function patchedBrowserNewPage(...args: any[]) {
+      const page = await originalNewPage.apply(this, args)
+      return patchPage(page)
+    }
+    browser.__kiroBrowserNewPagePatched = true
+  }
+
+  if (typeof browser.newContext === 'function' && !browser.__kiroNewContextPatched) {
+    const originalNewContext = browser.newContext
+    browser.newContext = async function patchedNewContext(...args: any[]) {
+      const context = await originalNewContext.apply(this, args)
+      return patchContext(context)
+    }
+    browser.__kiroNewContextPatched = true
+  }
+
+  return browser
+}
+
+function patchBrowserType(browserType: any) {
+  if (!browserType || typeof browserType.launch !== 'function' || browserType.__kiroLaunchPatched) {
+    return
+  }
+
+  const originalLaunch = browserType.launch
+  browserType.launch = async function patchedLaunch(...args: any[]) {
+    const browser = await originalLaunch.apply(this, args)
+    return patchBrowser(browser)
+  }
+  browserType.__kiroLaunchPatched = true
+}
+
+function patchPlaywrightScreenshotPath(autoRegisterPath: string) {
+  if (screenshotPatchApplied) {
+    return
+  }
+
+  const playwrightPath = require.resolve('playwright', {
+    paths: [path.dirname(autoRegisterPath)]
+  })
+  const playwright = require(playwrightPath)
+
+  patchBrowserType(playwright.chromium)
+  patchBrowserType(playwright.firefox)
+  patchBrowserType(playwright.webkit)
+
+  screenshotPatchApplied = true
+  console.log(`📸 调试截图目录: ${DEBUG_IMAGE_DIR}`)
+}
+
 // 运行时动态导入，避免 TypeScript 编译时检查
 export async function getAutoRegisterAWS() {
   // 计算绝对路径：从项目根目录加载
@@ -39,6 +142,7 @@ export async function getAutoRegisterAWS() {
   
   try {
     console.log(`📦 加载路径: ${autoRegisterPath}`)
+    patchPlaywrightScreenshotPath(autoRegisterPath)
     
     // 使用 require 动态加载（运行时解析）
     const autoRegisterModule = require(autoRegisterPath)

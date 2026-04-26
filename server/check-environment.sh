@@ -189,13 +189,13 @@ check_nginx() {
 check_ports() {
     print_header "检查端口占用"
     
-    # 检查 3000 端口
+    # 检查 1455 端口
     if command -v netstat &> /dev/null; then
-        if netstat -tuln | grep -q ":3000 "; then
-            print_warning "端口 3000 已被占用"
+        if netstat -tuln | grep -q ":1455 "; then
+            print_warning "端口 1455 已被占用"
             WARN_COUNT=$((WARN_COUNT + 1))
         else
-            print_success "端口 3000 可用 ✓"
+            print_success "端口 1455 可用 ✓"
             PASS_COUNT=$((PASS_COUNT + 1))
         fi
         

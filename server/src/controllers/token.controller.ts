@@ -5,7 +5,7 @@
 import { Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import { AccountDB } from '../services/database.adapter'
-import { TokenSubmitDTO, AccountRequestDTO } from '../models/token.model'
+import { TokenSubmitDTO, AccountRequestDTO, OidcTokenResponse } from '../models/token.model'
 import { ImportFromAppDTO, Account } from '../models/account.model'
 
 /**
@@ -71,6 +71,7 @@ export async function submitToken(req: Request, res: Response) {
         visitorId: undefined,
         credentials: {
           accessToken: ssoResult.accessToken || '',
+          ssoToken: x_amz_sso_authn,
           refreshToken: ssoResult.refreshToken || '',
           clientId: ssoResult.clientId || '',
           clientSecret: ssoResult.clientSecret || '',
@@ -107,12 +108,22 @@ export async function submitToken(req: Request, res: Response) {
       console.log(`📝 账号已存在，更新凭证: ${email}`)
 
       // 更新现有账号的OAuth信息
-      await AccountDB.updateToken(account.id, ssoResult.accessToken)
-      await AccountDB.updateOAuthCredentials(account.id, {
-        refresh_token: ssoResult.refreshToken,
-        client_id: ssoResult.clientId,
-        client_secret: ssoResult.clientSecret,
-        region: ssoResult.region || region
+      await AccountDB.update(account.id, {
+        credentials: {
+          ...account.credentials,
+          accessToken: ssoResult.accessToken,
+          ssoToken: x_amz_sso_authn,
+          refreshToken: ssoResult.refreshToken || account.credentials.refreshToken,
+          clientId: ssoResult.clientId || account.credentials.clientId,
+          clientSecret: ssoResult.clientSecret || account.credentials.clientSecret,
+          region: ssoResult.region || account.credentials.region || region,
+          authMethod: 'IdC'
+        },
+        status: 'active',
+        lastError: undefined,
+        consecutiveFailures: 0,
+        isActive: true,
+        lastCheckedAt: Date.now()
       })
 
       console.log(`✅ 凭证已更新: ${email}`)
@@ -402,7 +413,7 @@ export async function refreshToken(req: Request, res: Response) {
         })
       }
       
-      const data = await response.json()
+      const data = await response.json() as OidcTokenResponse
       console.log(`[OIDC] Token refreshed successfully, expires in ${data.expiresIn}s`)
       
       // ✅ 只更新 access_token，保留原始的 sso_token
@@ -695,7 +706,7 @@ export async function syncAccountUsage(req: Request, res: Response) {
         })
         
         if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json()
+          const refreshData = await refreshResponse.json() as OidcTokenResponse
           
           // ✅ 只更新 access_token
           await AccountDB.updateAccessToken(id as string, refreshData.accessToken)

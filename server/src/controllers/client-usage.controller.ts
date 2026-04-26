@@ -5,6 +5,7 @@
 
 import { Request, Response } from 'express'
 import { AccountDB } from '../services/database.adapter'
+import { OidcTokenResponse } from '../models/token.model'
 import { syncAccountUsage } from '../services/kiro-api.service'
 import { emitAccountUpdate } from '../websocket/socket.handler'
 
@@ -91,7 +92,7 @@ export async function getAccountUsage(req: Request, res: Response) {
           })
         }
         
-        const data = await response.json()
+        const data = await response.json() as OidcTokenResponse
         currentAccessToken = data.accessToken
         
         // 更新Token到数据库

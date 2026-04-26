@@ -66,7 +66,7 @@ check_port() {
 }
 
 echo "🔍 检查端口占用..."
-if ! check_port 3000; then
+if ! check_port 1455; then
     exit 1
 fi
 
@@ -82,11 +82,11 @@ echo "=========================================="
 echo "  启动服务"
 echo "=========================================="
 echo ""
-echo "主服务端口: 3000"
+echo "主服务端口: 1455"
 echo "认证服务端口: 2233"
 echo ""
-echo "管理面板: http://localhost:3000"
-echo "管理员登录: http://localhost:3000/admin-login"
+echo "管理面板: http://localhost:1455"
+echo "管理员登录: http://localhost:1455/admin-login"
 echo ""
 echo "默认管理员账户:"
 echo "  邮箱: admin@user.com"

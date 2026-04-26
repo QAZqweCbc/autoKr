@@ -3,13 +3,14 @@
  * 主入口文件
  */
 
+import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import { Server as SocketIOServer } from 'socket.io'
 import { createServer } from 'http'
 import path from 'path'
 import { createProxyMiddleware } from 'http-proxy-middleware'
-import { initDatabase, closeDatabase } from './services/database.adapter'
+import { initDatabase, closeDatabase, forceJsonFallback, getStorageMode } from './services/database.adapter'
 import { initWebSocket } from './websocket/socket.handler'
 import apiRoutes from './routes'
 import { logger, requestLogger } from './utils/logger'
@@ -20,13 +21,38 @@ import {
   metricsHandler,
   monitoringMiddleware 
 } from './middleware/health-check'
+import { validateEncryptionSetup } from './utils/crypto.util'
+import { validateJwtSetup } from './middleware/auth.middleware'
+import { requestIdMiddleware } from './middleware/request-id.middleware'
+
+// ============================================
+// 启动前验证：加密密钥和JWT密钥
+// ============================================
+validateEncryptionSetup()
+validateJwtSetup()
 
 const app = express()
 const httpServer = createServer(app)
+
+const PORT = process.env.PORT || 1455
+
+// ============================================
+// CORS 配置
+// ============================================
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [
+  'http://localhost:1455',
+  'http://localhost:5173',  // Vite dev server
+  'http://127.0.0.1:1455',
+  'http://127.0.0.1:5173'
+]
+
+logger.info('🔒 CORS 允许的来源:', ALLOWED_ORIGINS)
+
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
+    origin: ALLOWED_ORIGINS,  // 使用相同的CORS配置
+    methods: ['GET', 'POST'],
+    credentials: true
   },
   // 调整心跳配置：只在有实际操作时才响应
   pingInterval: 60000,  // 心跳间隔：60秒（默认25秒）
@@ -34,14 +60,29 @@ const io = new SocketIOServer(httpServer, {
   transports: ['websocket', 'polling']
 })
 
-const PORT = process.env.PORT || 3000
-
 // 将 io 实例挂载到 app，供健康检查使用
 ;(app as any).io = io
 
 // 中间件
-app.use(cors())
+app.use(cors({
+  origin: (origin, callback) => {
+    // 允许无 origin 的请求（如 Postman、curl、服务器端请求）
+    if (!origin) return callback(null, true)
+    
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true)
+    } else {
+      logger.warn('CORS blocked origin:', origin)
+      callback(new Error(`来源 ${origin} 不在允许列表中`))
+    }
+  },
+  credentials: true,  // 允许携带凭证
+  maxAge: 86400  // 预检请求缓存24小时
+}))
 app.use(express.json())
+
+// Request ID 追踪中间件（必须在其他中间件之前）
+app.use(requestIdMiddleware)
 
 // 监控中间件（记录请求指标）
 app.use(monitoringMiddleware)
@@ -125,7 +166,13 @@ async function start() {
     
     // 初始化数据库
     logger.info('📦 初始化数据库...')
-    await initDatabase()
+    try {
+      await initDatabase()
+    } catch (error: any) {
+      forceJsonFallback(error?.message || '数据库初始化失败')
+      logger.warn('⚠️  已降级到 JSON 存储模式继续启动')
+    }
+    logger.info(`📦 当前存储模式: ${getStorageMode().toUpperCase()}`)
     
     // 初始化 WebSocket
     logger.info('🔌 初始化 WebSocket...')

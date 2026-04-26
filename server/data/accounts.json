@@ -1,0 +1,28 @@
+[
+  {
+    "id": "test-complete-1",
+    "email": "complete@example.com",
+    "password": "password123",
+    "credentials": {
+      "accessToken": "complete_token",
+      "refreshToken": "complete_refresh",
+      "clientId": "complete_client",
+      "clientSecret": "complete_secret",
+      "expiresAt": 1771020309195
+    },
+    "subscription": {
+      "type": "Pro"
+    },
+    "usage": {
+      "current": 300,
+      "limit": 3000,
+      "percentUsed": 10,
+      "lastUpdated": 1771016709195
+    },
+    "status": "active",
+    "lastError": "Test error",
+    "consecutiveFailures": 1,
+    "lastCheckedAt": 1771016709195,
+    "createdAt": 1771016709195
+  }
+]

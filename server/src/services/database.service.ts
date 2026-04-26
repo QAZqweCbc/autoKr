@@ -68,6 +68,7 @@ function loadData() {
             accessToken: acc.access_token || acc.x_amz_sso_authn || '',
             csrfToken: acc.csrf_token,
             refreshToken: acc.refresh_token,
+            ssoToken: acc.x_amz_sso_authn,
             clientId: acc.client_id,
             clientSecret: acc.client_secret,
             region: acc.region || 'us-east-1',
@@ -113,6 +114,7 @@ function loadData() {
           
           groupId: acc.group_id,
           tags: acc.tags ? (typeof acc.tags === 'string' ? JSON.parse(acc.tags) : acc.tags) : undefined,
+          ownerUserId: acc.owner_user_id,
           status: acc.status || 'pending',
           // 新增：错误状态管理字段（数据迁移）
           lastError: acc.last_error,

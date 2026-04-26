@@ -19,37 +19,20 @@ import {
 
 const router = Router()
 
-// 获取配置
+// ============================================
+// 配置管理路由（认证已禁用 - 个人使用）
+// ============================================
+
 router.get('/', getConfig)
-
-// 更新配置
-router.put('/', updateConfigHandler)
-
-// 测试连接
-router.post('/test', testConnection)
-
-// 获取邮箱配置
 router.get('/email', getEmailConfig)
-
-// 更新邮箱配置
-router.put('/email', updateEmailConfig)
-
-// 测试邮箱连接
-router.post('/email/test', testEmailConnection)
-
-// 获取自动刷新配置
 router.get('/auto-refresh', getAutoRefreshConfig)
-
-// 保存自动刷新配置
-router.post('/auto-refresh', saveAutoRefreshConfig)
-
-// 获取配置变更历史
 router.get('/changes', getConfigChangeHistory)
-
-// 获取配置迁移历史
 router.get('/migrations', getConfigMigrationHistory)
-
-// 验证配置完整性
 router.get('/validate', validateConfigCompletenessHandler)
+router.put('/', updateConfigHandler)
+router.post('/test', testConnection)
+router.put('/email', updateEmailConfig)
+router.post('/email/test', testEmailConnection)
+router.post('/auto-refresh', saveAutoRefreshConfig)
 
 export default router

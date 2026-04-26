@@ -4,6 +4,7 @@
  */
 
 import { Request, Response } from 'express'
+import { OidcTokenResponse } from '../../models/token.model'
 import { v4 as uuidv4 } from 'uuid'
 import { TokenAllocationService } from '../../services/token-allocation.service'
 import { findClientUserById } from '../../services/client-user.service'
@@ -355,7 +356,7 @@ export async function refreshToken(req: Request, res: Response) {
           })
         }
         
-        const data = await response.json()
+        const data = await response.json() as OidcTokenResponse
         currentAccessToken = data.accessToken
         
         // 更新Token到数据库

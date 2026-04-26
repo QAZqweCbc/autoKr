@@ -5,12 +5,10 @@
 import { Request, Response, NextFunction } from 'express'
 import { verifyToken, JWTPayload } from '../services/jwt.service'
 
-// 扩展Express Request类型
-declare global {
-  namespace Express {
-    interface Request {
-      user?: JWTPayload
-    }
+// 扩展Express Request类型 - 使用 module augmentation
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: JWTPayload
   }
 }
 

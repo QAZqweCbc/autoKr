@@ -15,11 +15,46 @@ const IV_LENGTH = 16
 const AUTH_TAG_LENGTH = 16
 
 /**
- * 从环境变量或配置获取加密密钥
- * 如果没有配置，使用默认密钥（生产环境应该使用环境变量）
+ * 从环境变量获取加密密钥
+ * 如果没有配置，在开发环境使用默认密钥（生产环境会警告）
  */
 function getEncryptionKey(): Buffer {
-  const keyString = process.env.ENCRYPTION_KEY || 'kiro-default-encryption-key-change-in-production'
+  const keyString = process.env.ENCRYPTION_KEY
+  
+  if (!keyString) {
+    const isDevelopment = process.env.NODE_ENV !== 'production'
+    
+    if (isDevelopment) {
+      // 开发环境：使用默认密钥并警告
+      console.warn('⚠️  警告: 未设置 ENCRYPTION_KEY，使用默认密钥（仅用于开发）')
+      console.warn('⚠️  生产环境请务必设置自定义加密密钥！')
+      const defaultKey = 'default-development-key-do-not-use-in-production-32chars'
+      return crypto.createHash('sha256').update(defaultKey).digest()
+    } else {
+      // 生产环境：强制要求配置
+      throw new Error(
+        '\n' + '='.repeat(60) + '\n' +
+        '❌ 生产环境未设置加密密钥！\n' +
+        '='.repeat(60) + '\n' +
+        '请在 .env 文件中设置 ENCRYPTION_KEY 环境变量\n\n' +
+        '生成密钥命令:\n' +
+        '  openssl rand -base64 32\n\n' +
+        '或者:\n' +
+        '  node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))"\n\n' +
+        '示例:\n' +
+        '  ENCRYPTION_KEY=your-32-character-or-longer-encryption-key-here\n' +
+        '='.repeat(60)
+      )
+    }
+  }
+  
+  if (keyString.length < 32) {
+    throw new Error(
+      '❌ 加密密钥长度必须至少32字符\n' +
+      `当前长度: ${keyString.length} 字符\n` +
+      '请使用更长的密钥以确保安全性'
+    )
+  }
   
   // 使用 SHA-256 生成固定长度的密钥
   return crypto.createHash('sha256').update(keyString).digest()
@@ -83,6 +118,24 @@ export function decrypt(encryptedText: string): string {
   } catch (error: any) {
     console.error('❌ 解密失败:', error.message)
     throw new Error('解密失败')
+  }
+}
+
+/**
+ * 验证加密设置
+ * 在服务启动时调用，确保加密密钥已正确配置
+ */
+export function validateEncryptionSetup(): void {
+  try {
+    getEncryptionKey()
+    if (process.env.ENCRYPTION_KEY) {
+      console.log('✅ 加密密钥已配置')
+    } else {
+      console.log('⚠️  使用默认加密密钥（开发模式）')
+    }
+  } catch (error: any) {
+    console.error(error.message)
+    process.exit(1)
   }
 }
 

@@ -92,7 +92,6 @@ export async function kiroApiRequest<T>(
 export interface UserInfoResponse {
   email?: string
   userId?: string
-  nickname?: string
   idp?: string
   status?: string
   featureFlags?: string[]
@@ -166,6 +165,23 @@ export async function getUserUsageAndLimits(
   )
 }
 
+async function getUserUsageAndLimitsWithRetry(
+  accessToken: string,
+  idp: string = 'BuilderId'
+): Promise<UsageResponse> {
+  try {
+    return await getUserUsageAndLimits(accessToken, idp)
+  } catch (error: any) {
+    if (!error?.message?.includes('UnauthorizedException')) {
+      throw error
+    }
+
+    console.warn('[Kiro API] GetUserUsageAndLimits unauthorized, retrying once...')
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    return getUserUsageAndLimits(accessToken, idp)
+  }
+}
+
 /**
  * 同步账号的使用量信息
  * 返回需要更新到数据库的字段
@@ -178,7 +194,6 @@ export async function syncAccountUsage(
   data?: {
     // 用户信息
     user_id?: string
-    nickname?: string
     idp?: string
     
     // 订阅信息
@@ -204,7 +219,6 @@ export async function syncAccountUsage(
     
     // 资源详情
     resource_display_name?: string
-    resource_display_name_plural?: string
     resource_type?: string
     resource_currency?: string
     resource_unit?: string
@@ -221,7 +235,7 @@ export async function syncAccountUsage(
     // 并行调用两个 API
     const [userInfo, usageInfo] = await Promise.all([
       getUserInfo(accessToken, idp).catch(() => undefined),
-      getUserUsageAndLimits(accessToken, idp)
+      getUserUsageAndLimitsWithRetry(accessToken, idp)
     ])
 
     console.log('[Kiro API] Raw usageInfo:', JSON.stringify(usageInfo, null, 2))
@@ -253,7 +267,6 @@ export async function syncAccountUsage(
       data: {
         // 用户信息
         user_id: userInfo?.userId || usageInfo.userInfo?.userId,
-        nickname: userInfo?.email?.split('@')[0], // 从邮箱提取昵称
         idp: userInfo?.idp || idp,
         
         // 订阅信息
@@ -283,7 +296,6 @@ export async function syncAccountUsage(
         
         // 资源详情
         resource_display_name: usageBreakdown?.displayName,
-        resource_display_name_plural: usageBreakdown?.displayNamePlural,
         resource_type: usageBreakdown?.resourceType,
         resource_currency: usageBreakdown?.currency,
         resource_unit: usageBreakdown?.unit,

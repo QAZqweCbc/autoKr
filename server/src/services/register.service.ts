@@ -11,7 +11,6 @@ import { emitTaskUpdate, emitTaskLog, emitAccountUpdate } from '../websocket/soc
 import { loadBrowserConfig, applyLinuxOptimizations, getEnvironmentInfo } from './config.service'
 import { getEmailConfigForInternal } from './email-config-manager.service'
 import { syncAccountUsage } from './kiro-api.service'
-import { logRegistration, RegistrationLog } from './registration-log.service'
 
 // 当前正在执行的任务数
 let runningTasks = 0
@@ -69,7 +68,6 @@ export async function startRegisterTask(task: Task) {
  */
 async function executeTask(task: Task) {
   runningTasks++
-  const startTime = Date.now()  // 记录开始时间
   
   try {
     console.log(`\n${'='.repeat(60)}`)
@@ -165,42 +163,26 @@ async function executeTask(task: Task) {
     
     if (result.success) {
       // 注册成功
-      const duration = Date.now() - startTime
-      console.log(`✅ 注册成功 [${task.email}] (耗时: ${duration}ms)`)
+      console.log(`✅ 注册成功 [${task.email}]`)
       console.log(`  SSO Token: ${result.ssoToken?.substring(0, 20)}...`)
       console.log(`  姓名: ${result.name}`)
-      
-      // 检查是否获取到完整的 OAuth 凭证
-      if (result.accessToken && result.refreshToken && result.clientId) {
-        console.log(`  ✅ 获取到完整 OAuth 凭证`)
-        console.log(`  - Access Token: ${result.accessToken.substring(0, 20)}...`)
-        console.log(`  - Refresh Token: ${result.refreshToken.substring(0, 20)}...`)
-        console.log(`  - Client ID: ${result.clientId.substring(0, 30)}...`)
-      } else {
-        console.log(`  ⚠️ 缺少 OAuth 凭证，账号将无法自动刷新`)
-      }
-      
       log('✅ 注册成功！')
-      log(`⏱️ 耗时: ${(duration / 1000).toFixed(2)}秒`)
       
       // 保存账号
       try {
-        // 准备基本账号数据 - 正确映射字段到 credentials 对象
-        const baseAccountData: Account = {
+        // 准备基本账号数据
+        const baseAccountData = {
           id: uuidv4(),
           email: task.email,
           password: task.password,
-          nickname: undefined,
           idp: 'BuilderId' as IdpType,
-          userId: undefined,
-          visitorId: undefined,
+          status: 'active' as AccountStatus,
+          isActive: true,
           credentials: {
-            // ✅ 正确的字段映射
-            accessToken: result.accessToken || '',           // OAuth Access Token
-            ssoToken: result.ssoToken || '',                 // SSO Token (x-amz-sso_authn)
-            refreshToken: result.refreshToken || '',         // OAuth Refresh Token
-            clientId: result.clientId || '',                 // OAuth Client ID
-            clientSecret: result.clientSecret || '',         // OAuth Client Secret
+            accessToken: result.ssoToken || '',
+            refreshToken: task.auth_code,
+            clientId: task.client_id,
+            clientSecret: '',
             region: 'us-east-1'
           },
           subscription: {
@@ -212,35 +194,16 @@ async function executeTask(task: Task) {
             percentUsed: 0,
             lastUpdated: Date.now()
           },
-          groupId: undefined,
-          tags: undefined,
-          status: 'active' as AccountStatus,
-          lastError: undefined,
-          consecutiveFailures: 0,
-          isActive: true,
-          deviceId: undefined,
-          assignedAt: undefined,
-          createdAt: Date.now(),
-          lastUsedAt: undefined,
-          lastCheckedAt: undefined
-        }
+          createdAt: Date.now()
+        } as Account
         
         // 尝试同步完整账号信息（用户信息、订阅信息、使用量等）
         log('正在获取账号详细信息...')
         console.log(`[${task.email}] 调用 Kiro API 同步账号信息...`)
         
-        // 新注册账号可能需要等待 token 生效，添加重试逻辑
-        let syncResult = await syncAccountUsage(result.ssoToken || '', 'BuilderId')
-        
-        if (!syncResult.success && syncResult.error?.includes('401')) {
-          log('⏳ Token 尚未生效，等待 3 秒后重试...')
-          await new Promise(resolve => setTimeout(resolve, 3000))
-          syncResult = await syncAccountUsage(result.ssoToken || '', 'BuilderId')
-        }
+        const syncResult = await syncAccountUsage(result.ssoToken || '', 'BuilderId')
         
         let accountData = baseAccountData
-        let registrationLogData: Partial<RegistrationLog> = {}
-        
         if (syncResult.success && syncResult.data) {
           // 同步成功，使用映射工具更新账户信息
           log('✅ 账号信息同步成功')
@@ -249,30 +212,8 @@ async function executeTask(task: Task) {
           console.log(`  - 订阅类型: ${syncResult.data.subscription_title}`)
           console.log(`  - 使用量: ${syncResult.data.usage_current}/${syncResult.data.usage_limit}`)
           
-          // 在实时日志中显示详细信息
-          log(`📊 账号详情:`)
-          log(`  用户ID: ${syncResult.data.user_id}`)
-          log(`  昵称: ${syncResult.data.nickname || '未设置'}`)
-          log(`  订阅: ${syncResult.data.subscription_title} (${syncResult.data.subscription_status})`)
-          log(`  剩余天数: ${syncResult.data.days_remaining || 0}天`)
-          log(`  使用量: ${syncResult.data.usage_current}/${syncResult.data.usage_limit} (${syncResult.data.usage_percent}%)`)
-          
           const { updateAccountUsage } = await import('../utils/account-mapper')
           accountData = updateAccountUsage(baseAccountData, syncResult.data)
-          
-          // 保存到注册日志
-          registrationLogData = {
-            user_id: syncResult.data.user_id,
-            nickname: syncResult.data.nickname,
-            subscription_type: syncResult.data.subscription_type,
-            subscription_title: syncResult.data.subscription_title,
-            subscription_status: syncResult.data.subscription_status,
-            days_remaining: syncResult.data.days_remaining,
-            expires_at: syncResult.data.expires_at,
-            usage_current: syncResult.data.usage_current,
-            usage_limit: syncResult.data.usage_limit,
-            usage_percent: syncResult.data.usage_percent
-          }
         } else {
           // 同步失败，记录警告但继续保存基本信息
           log(`⚠️ 账号信息同步失败: ${syncResult.error || '未知错误'}`)
@@ -284,43 +225,6 @@ async function executeTask(task: Task) {
         await AccountDB.create(accountData)
         console.log(`💾 账号已保存到数据库`)
         log('💾 账号已保存')
-        
-        // 📝 记录注册日志到数据库
-        try {
-          const registrationLog: RegistrationLog = {
-            id: uuidv4(),
-            task_id: task.id,
-            email: task.email,
-            status: 'success',
-            sso_token: result.ssoToken,
-            access_token: result.accessToken,
-            refresh_token: result.refreshToken,
-            client_id: result.clientId,
-            client_secret: result.clientSecret,
-            region: 'us-east-1',
-            idp: 'BuilderId',
-            browser_type: optimizedConfig.browserType,
-            headless: optimizedConfig.headless,
-            proxy_url: task.proxy_url,
-            duration,
-            created_at: Date.now(),
-            ...registrationLogData
-          }
-          
-          await logRegistration(registrationLog)
-          console.log(`📝 注册日志已保存`)
-          log('📝 注册日志已记录')
-        } catch (logError: any) {
-          console.error(`⚠️ 保存注册日志失败:`, logError.message)
-        }
-        
-        // 触发自动分配给等待的用户
-        try {
-          const { handleAccountGenerationComplete } = await import('./auto-approval.service')
-          await handleAccountGenerationComplete(accountData.id)
-        } catch (autoAssignError: any) {
-          console.warn(`⚠️ 自动分配失败: ${autoAssignError.message}`)
-        }
         
         // 通知前端账号列表已更新
         emitAccountUpdate()
@@ -335,32 +239,9 @@ async function executeTask(task: Task) {
       
     } else {
       // 注册失败
-      const duration = Date.now() - startTime
       const error = result.error || '未知错误'
-      console.error(`❌ 注册失败 [${task.email}]: ${error} (耗时: ${duration}ms)`)
+      console.error(`❌ 注册失败 [${task.email}]: ${error}`)
       log(`❌ 注册失败: ${error}`)
-      log(`⏱️ 耗时: ${(duration / 1000).toFixed(2)}秒`)
-      
-      // 📝 记录失败日志
-      try {
-        const registrationLog: RegistrationLog = {
-          id: uuidv4(),
-          task_id: task.id,
-          email: task.email,
-          status: 'failed',
-          browser_type: optimizedConfig.browserType,
-          headless: optimizedConfig.headless,
-          proxy_url: task.proxy_url,
-          duration,
-          error_message: error,
-          created_at: Date.now()
-        }
-        
-        await logRegistration(registrationLog)
-        console.log(`📝 失败日志已保存`)
-      } catch (logError: any) {
-        console.error(`⚠️ 保存失败日志失败:`, logError.message)
-      }
       
       await TaskDB.updateStatus(task.id, 'failed', error)
       emitTaskUpdate(task.id, 'failed', error)

@@ -39,7 +39,7 @@ export function getDatabaseConfig(req: Request, res: Response) {
 /**
  * 更新数据库配置
  */
-export function updateDatabaseConfig(req: Request, res: Response) {
+export async function updateDatabaseConfig(req: Request, res: Response) {
   try {
     const newConfig = req.body as DatabaseConfig
     
@@ -67,10 +67,38 @@ export function updateDatabaseConfig(req: Request, res: Response) {
     // 保存配置
     saveDatabaseConfig(newConfig)
     
+    // 🔥 热重载：如果存储模式改变，自动重新初始化数据库连接
+    let reloadResult = {
+      reloaded: false,
+      oldStorage: currentConfig.storage,
+      newStorage: newConfig.storage,
+      error: undefined as string | undefined
+    }
+    
+    if (currentConfig.storage !== newConfig.storage) {
+      try {
+        console.log(`\n🔄 检测到存储模式变更: ${currentConfig.storage} → ${newConfig.storage}`)
+        console.log('正在热重载数据库连接...')
+        
+        // 动态导入以避免循环依赖
+        const { reloadDatabase } = await import('../services/database-reload.service')
+        await reloadDatabase()
+        
+        reloadResult.reloaded = true
+        console.log('✅ 数据库连接已热重载')
+      } catch (error: any) {
+        console.error('❌ 热重载失败:', error.message)
+        reloadResult.error = error.message
+      }
+    }
+    
     res.json({
       success: true,
       config: getMaskedConfig(newConfig),
-      message: '配置已保存，请重启服务器使配置生效'
+      message: reloadResult.reloaded 
+        ? '配置已保存并自动切换存储模式，无需重启服务器' 
+        : '配置已保存',
+      reload: reloadResult
     })
   } catch (error: any) {
     console.error('更新数据库配置失败:', error)

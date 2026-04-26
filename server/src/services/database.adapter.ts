@@ -15,41 +15,107 @@ export type { Task, Account }
 
 let currentStorage: 'json' | 'mysql' | 'redis' = 'json'
 let config: DatabaseConfig
+let isInitialized = false
+let initializationPromise: Promise<void> | null = null
+
+export function forceJsonFallback(reason: string) {
+  console.warn('\n' + '='.repeat(60))
+  console.warn('⚠️  数据库初始化失败，已自动降级到 JSON 存储模式')
+  console.warn('='.repeat(60))
+  console.warn(`原因: ${reason}`)
+  console.warn('提示:')
+  console.warn('  1. 服务会继续启动，不中断当前运行')
+  console.warn('  2. 当前数据将写入本地 JSON 文件')
+  console.warn('  3. 后续修复数据库配置后，重启服务即可恢复')
+  console.warn('='.repeat(60) + '\n')
+
+  currentStorage = 'json'
+  isInitialized = true
+  initJSON()
+}
 
 /**
  * 初始化数据库（根据配置自动选择）
  */
 export async function initDatabase() {
-  config = loadDatabaseConfig()
-  currentStorage = config.storage
-  
-  console.log(`\n📦 存储模式: ${currentStorage.toUpperCase()}`)
-  
-  if (currentStorage === 'mysql') {
-    // 初始化 MySQL
-    if (!config.mysql) {
-      throw new Error('MySQL 配置缺失')
-    }
-    await initMySQL(config.mysql)
-    
-    // 初始化 Redis（可选，用于缓存）
-    if (config.redis && config.redis.host) {
-      try {
-        await initRedis(config.redis)
-      } catch (error) {
-        console.warn('⚠️  Redis 连接失败，将不使用缓存')
-      }
-    }
-  } else if (currentStorage === 'redis') {
-    // 初始化 Redis（作为主存储）
-    if (!config.redis) {
-      throw new Error('Redis 配置缺失')
-    }
-    await initRedis(config.redis)
-  } else {
-    // 初始化 JSON 文件存储
-    initJSON()
+  // 如果已经在初始化中，返回同一个Promise
+  if (initializationPromise) {
+    return initializationPromise
   }
+  
+  initializationPromise = (async () => {
+    try {
+      config = loadDatabaseConfig()
+      currentStorage = config.storage
+      
+      console.log(`\n📦 存储模式: ${currentStorage.toUpperCase()}`)
+      
+      if (currentStorage === 'mysql') {
+        // 初始化 MySQL
+        if (!config.mysql) {
+          throw new Error('MySQL 配置缺失')
+        }
+        await initMySQL(config.mysql)
+        
+        // 初始化 Redis（可选，用于缓存）
+        if (config.redis && config.redis.host && config.redis.host.trim() !== '') {
+          try {
+            await initRedis(config.redis)
+          } catch (error) {
+            console.warn('⚠️  Redis 连接失败，将不使用缓存')
+          }
+        } else {
+          console.log('ℹ️  Redis 未配置，跳过缓存初始化')
+        }
+      } else if (currentStorage === 'redis') {
+        // 初始化 Redis（作为主存储）
+        if (!config.redis || !config.redis.host || config.redis.host.trim() === '') {
+          throw new Error('Redis 配置缺失或主机地址为空')
+        }
+        await initRedis(config.redis)
+      } else {
+        // 初始化 JSON 文件存储
+        initJSON()
+      }
+      
+      isInitialized = true
+      console.log('✅ 数据库初始化完成')
+    } catch (error: any) {
+      console.error('❌ 数据库初始化失败:', error.message)
+      isInitialized = false
+      initializationPromise = null
+      throw error
+    }
+  })()
+  
+  return initializationPromise
+}
+
+/**
+ * 检查数据库是否已初始化
+ */
+export function isDatabaseInitialized(): boolean {
+  return isInitialized
+}
+
+/**
+ * 等待数据库初始化完成
+ */
+export async function waitForDatabaseInit(timeoutMs: number = 30000): Promise<void> {
+  if (isInitialized) {
+    return
+  }
+  
+  if (initializationPromise) {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('数据库初始化超时')), timeoutMs)
+    })
+    
+    await Promise.race([initializationPromise, timeoutPromise])
+    return
+  }
+  
+  throw new Error('数据库未开始初始化')
 }
 
 /**
@@ -69,6 +135,17 @@ export async function closeDatabase() {
  */
 export function getStorageMode() {
   return currentStorage
+}
+
+/**
+ * 更新存储模式（用于热重载）
+ * @internal 仅供 database-reload.service 使用
+ */
+export function updateStorageMode(newStorage: 'json' | 'mysql' | 'redis') {
+  console.log(`🔄 适配器存储模式更新: ${currentStorage} → ${newStorage}`)
+  currentStorage = newStorage
+  isInitialized = true
+  initializationPromise = null
 }
 
 // ==================== 任务操作适配器 ====================

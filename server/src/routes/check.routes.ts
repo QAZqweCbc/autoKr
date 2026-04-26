@@ -15,19 +15,16 @@ import {
 
 const router = Router()
 
-// IP 状态检测
+// ============================================
+// IP/域名检测路由（认证已禁用 - 个人使用）
+// ============================================
+
 router.post('/ip', checkIPStatus)
-
-// 域名分析
 router.post('/domains', analyzeDomains)
-
-// 检测记录管理
 router.get('/records', getCheckRecords)
 router.get('/records/:id', getCheckRecordDetail)
+router.get('/stats', getCheckStatistics)
 router.delete('/records/:id', deleteCheckRecordById)
 router.delete('/records', clearCheckRecords)
-
-// 检测统计
-router.get('/stats', getCheckStatistics)
 
 export default router

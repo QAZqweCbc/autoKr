@@ -5,14 +5,14 @@
 import { getPool } from './mysql.service'
 import { Account, AccountStats } from '../models/account.model'
 import { accountToFlat, flatToAccount, updateAccountUsage } from '../utils/account-mapper'
+import { withTransaction } from '../utils/transaction.util'
 
 export const MySQLAccountDBNew = {
   /**
-   * 创建账号
+   * 创建账号（使用事务保护）
    */
   async create(account: Account): Promise<Account> {
-    const connection = await getPool().getConnection()
-    try {
+    return withTransaction(async (connection) => {
       const flat = accountToFlat(account)
       
       // 确保所有值都不是 undefined
@@ -113,22 +113,25 @@ export const MySQLAccountDBNew = {
       )
       
       return account
-    } finally {
-      connection.release()
-    }
+    }, 'createAccount')
   },
 
   /**
-   * 更新账号
+   * 更新账号（使用事务保护）
    */
   async update(id: string, updates: Partial<Account>): Promise<void> {
-    const connection = await getPool().getConnection()
-    try {
+    return withTransaction(async (connection) => {
       // 先获取现有账号
-      const existing = await this.getById(id)
-      if (!existing) {
+      const [rows] = await connection.execute(
+        'SELECT * FROM accounts WHERE id = ?',
+        [id]
+      )
+      const accounts = rows as any[]
+      if (accounts.length === 0) {
         throw new Error(`Account ${id} not found`)
       }
+      
+      const existing = flatToAccount(accounts[0])
       
       // 合并更新
       const merged = { ...existing, ...updates }
@@ -152,9 +155,7 @@ export const MySQLAccountDBNew = {
           values
         )
       }
-    } finally {
-      connection.release()
-    }
+    }, 'updateAccount')
   },
 
   /**
@@ -207,15 +208,12 @@ export const MySQLAccountDBNew = {
   },
 
   /**
-   * 删除账号
+   * 删除账号（使用事务保护）
    */
   async delete(id: string): Promise<void> {
-    const connection = await getPool().getConnection()
-    try {
+    return withTransaction(async (connection) => {
       await connection.execute('DELETE FROM accounts WHERE id = ?', [id])
-    } finally {
-      connection.release()
-    }
+    }, 'deleteAccount')
   },
 
   /**

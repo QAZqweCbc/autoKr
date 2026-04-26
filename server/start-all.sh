@@ -33,7 +33,7 @@ echo "认证服务 PID: $AUTH_PID"
 sleep 3
 
 # 启动主服务（前台运行）
-echo "🌐 启动主服务 (端口 3000)..."
+echo "🌐 启动主服务 (端口 1455)..."
 npm run start
 
 # 清理函数

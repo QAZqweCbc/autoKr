@@ -58,11 +58,11 @@ if not exist ".admin-initialized" (
 
 REM 检查端口占用
 echo 🔍 检查端口占用...
-netstat -ano | findstr :3000 >nul 2>nul
+netstat -ano | findstr :1455 >nul 2>nul
 if %ERRORLEVEL% EQU 0 (
-    echo ❌ 错误: 端口 3000 已被占用
+    echo ❌ 错误: 端口 1455 已被占用
     echo 请使用以下命令查看占用进程:
-    echo   netstat -ano ^| findstr :3000
+    echo   netstat -ano ^| findstr :1455
     echo 或者杀死占用进程:
     echo   taskkill /PID [进程ID] /F
     pause
@@ -86,11 +86,11 @@ echo ==========================================
 echo   启动服务
 echo ==========================================
 echo.
-echo 主服务端口: 3000
+echo 主服务端口: 1455
 echo 认证服务端口: 2233
 echo.
-echo 管理面板: http://localhost:3000
-echo 管理员登录: http://localhost:3000/admin-login
+echo 管理面板: http://localhost:1455
+echo 管理员登录: http://localhost:1455/admin-login
 echo.
 echo 默认管理员账户:
 echo   邮箱: admin@user.com

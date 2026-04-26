@@ -2,13 +2,20 @@
  * JWT服务
  */
 
-import jwt from 'jsonwebtoken'
+import * as jwt from 'jsonwebtoken'
 
 const JWT_SECRET = process.env.JWT_SECRET || (() => {
-  console.error('❌ 错误: 未设置 JWT_SECRET 环境变量！')
-  console.error('💡 请在 .env 文件中设置 JWT_SECRET')
-  console.error('💡 生成方法: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"')
-  process.exit(1)
+  const isDevelopment = process.env.NODE_ENV !== 'production'
+  
+  if (isDevelopment) {
+    console.warn('⚠️  [Auth Service] 警告: 未设置 JWT_SECRET，使用默认密钥（仅用于开发）')
+    return 'default-jwt-secret-do-not-use-in-production-must-be-at-least-32-characters-long'
+  } else {
+    console.error('❌ 错误: 生产环境未设置 JWT_SECRET 环境变量！')
+    console.error('💡 请在 .env 文件中设置 JWT_SECRET')
+    console.error('💡 生成方法: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"')
+    process.exit(1)
+  }
 })()
 const JWT_EXPIRES_IN = '7d'
 

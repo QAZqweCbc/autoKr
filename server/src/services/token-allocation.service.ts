@@ -144,7 +144,7 @@ export const TokenAllocationService = {
           a.email as account_email,
           a.usage_current,
           a.usage_limit,
-          a.usage_percent,
+          a.usage_percent_used as usage_percent,
           a.subscription_type
         FROM token_allocations ta
         JOIN client_users cu ON ta.user_id = cu.id
@@ -171,9 +171,9 @@ export const TokenAllocationService = {
       if (data.approved_at !== undefined) { updates.push('approved_at = ?'); values.push(data.approved_at) }
       if (data.approved_by !== undefined) { updates.push('approved_by = ?'); values.push(data.approved_by) }
       if (data.reject_reason !== undefined) { updates.push('reject_reason = ?'); values.push(data.reject_reason) }
+      if (data.revoke_reason !== undefined) { updates.push('revoke_reason = ?'); values.push(data.revoke_reason) }
       if (data.revoked_at !== undefined) { updates.push('revoked_at = ?'); values.push(data.revoked_at) }
       if (data.revoked_by !== undefined) { updates.push('revoked_by = ?'); values.push(data.revoked_by) }
-      if (data.revoke_reason !== undefined) { updates.push('revoke_reason = ?'); values.push(data.revoke_reason) }
       
       if (updates.length > 0) {
         values.push(id)

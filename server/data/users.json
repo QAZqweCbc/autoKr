@@ -1,0 +1,12 @@
+[
+  {
+    "id": "0420112b-01b3-44e5-8fb7-40d101fef922",
+    "username": "admin",
+    "email": "admin@kiro.local",
+    "password_hash": "$2b$10$YkCW40yRok5lb3kNPuoLw.RTZwusXCFDjiW0ASSy3NLUlgHf6wAiC",
+    "role": "admin",
+    "status": "active",
+    "created_at": 1770730667443,
+    "last_login_at": 1770745737215
+  }
+]

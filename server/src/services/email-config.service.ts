@@ -126,81 +126,89 @@ export async function saveEmailConfig(config: EmailConfig): Promise<void> {
  * @param decrypt 是否解密敏感信息（默认 true）
  */
 export async function getEmailConfig(decryptSecrets: boolean = true): Promise<EmailConfig | null> {
-  const pool = getPool()
-  const connection = await pool.getConnection()
-  
   try {
-    const [rows] = await connection.execute(
-      'SELECT * FROM email_config WHERE id = ? LIMIT 1',
-      ['default']
-    )
+    const pool = getPool()
+    const connection = await pool.getConnection()
     
-    const configs = rows as any[]
-    if (configs.length === 0) {
+    try {
+      const [rows] = await connection.execute(
+        'SELECT * FROM email_config WHERE id = ? LIMIT 1',
+        ['default']
+      )
+      
+      const configs = rows as any[]
+      if (configs.length === 0) {
+        return null
+      }
+      
+      const row = configs[0]
+      
+      // 构建配置对象
+      const config: EmailConfig = {
+        id: row.id,
+        qqEmail: row.qq_email,
+        authCode: row.auth_code,
+        domains: row.domains,
+        useAlias: Boolean(row.use_alias),
+        aliasType: row.alias_type,
+        gmailBase: row.gmail_base,
+        gmailAppPassword: row.gmail_app_password,
+        qqAliases: row.qq_aliases,
+        smtpHost: row.smtp_host,
+        smtpPort: row.smtp_port,
+        smtpSecure: Boolean(row.smtp_secure),
+        smtpUser: row.smtp_user,
+        smtpPassword: row.smtp_password,
+        smtpFrom: row.smtp_from,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }
+      
+      // 如果需要解密
+      if (decryptSecrets) {
+        if (config.authCode) {
+          try {
+            config.authCode = decrypt(config.authCode)
+          } catch (error) {
+            console.error('❌ 解密授权码失败')
+            config.authCode = undefined
+          }
+        }
+        
+        if (config.gmailAppPassword) {
+          try {
+            config.gmailAppPassword = decrypt(config.gmailAppPassword)
+          } catch (error) {
+            console.error('❌ 解密Gmail密码失败')
+            config.gmailAppPassword = undefined
+          }
+        }
+        
+        if (config.smtpPassword) {
+          try {
+            config.smtpPassword = decrypt(config.smtpPassword)
+          } catch (error) {
+            console.error('❌ 解密SMTP密码失败')
+            config.smtpPassword = undefined
+          }
+        }
+      } else {
+        // 不解密时，返回脱敏数据
+        config.authCode = config.authCode ? '******' : undefined
+        config.gmailAppPassword = config.gmailAppPassword ? '******' : undefined
+        config.smtpPassword = config.smtpPassword ? '******' : undefined
+      }
+      
+      return config
+    } finally {
+      connection.release()
+    }
+  } catch (error: any) {
+    if (error.message === 'MySQL 未初始化') {
+      console.warn('⚠️  MySQL 未初始化，无法获取邮箱配置')
       return null
     }
-    
-    const row = configs[0]
-    
-    // 构建配置对象
-    const config: EmailConfig = {
-      id: row.id,
-      qqEmail: row.qq_email,
-      authCode: row.auth_code,
-      domains: row.domains,
-      useAlias: Boolean(row.use_alias),
-      aliasType: row.alias_type,
-      gmailBase: row.gmail_base,
-      gmailAppPassword: row.gmail_app_password,
-      qqAliases: row.qq_aliases,
-      smtpHost: row.smtp_host,
-      smtpPort: row.smtp_port,
-      smtpSecure: Boolean(row.smtp_secure),
-      smtpUser: row.smtp_user,
-      smtpPassword: row.smtp_password,
-      smtpFrom: row.smtp_from,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
-    }
-    
-    // 如果需要解密
-    if (decryptSecrets) {
-      if (config.authCode) {
-        try {
-          config.authCode = decrypt(config.authCode)
-        } catch (error) {
-          console.error('❌ 解密授权码失败')
-          config.authCode = undefined
-        }
-      }
-      
-      if (config.gmailAppPassword) {
-        try {
-          config.gmailAppPassword = decrypt(config.gmailAppPassword)
-        } catch (error) {
-          console.error('❌ 解密Gmail密码失败')
-          config.gmailAppPassword = undefined
-        }
-      }
-      
-      if (config.smtpPassword) {
-        try {
-          config.smtpPassword = decrypt(config.smtpPassword)
-        } catch (error) {
-          console.error('❌ 解密SMTP密码失败')
-          config.smtpPassword = undefined
-        }
-      }
-    } else {
-      // 不解密时，返回脱敏数据
-      config.authCode = config.authCode ? '******' : undefined
-      config.gmailAppPassword = config.gmailAppPassword ? '******' : undefined
-      config.smtpPassword = config.smtpPassword ? '******' : undefined
-    }
-    
-    return config
-  } finally {
-    connection.release()
+    throw error
   }
 }
 

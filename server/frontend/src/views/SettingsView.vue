@@ -693,12 +693,23 @@ const handleSaveDb = async () => {
     
     const result = await saveDatabaseConfig(dbForm.value)
     if (result.success) {
+      // 检查是否进行了热重载
+      const reloadInfo = (result as any).reload
+      let message = result.message || '配置保存成功'
+      
+      if (reloadInfo?.reloaded) {
+        message = `✅ 配置已保存并自动切换存储模式！\n\n从 ${reloadInfo.oldStorage.toUpperCase()} 切换到 ${reloadInfo.newStorage.toUpperCase()}\n\n无需重启服务器，更改已立即生效。`
+      } else if (reloadInfo?.error) {
+        message = `⚠️ 配置已保存，但热重载失败：\n\n${reloadInfo.error}\n\n请手动重启服务器使配置生效。`
+      }
+      
       ElMessageBox.alert(
-        result.message || '配置保存成功！请重启服务器使配置生效。',
-        '保存成功',
+        message,
+        reloadInfo?.reloaded ? '🎉 热重载成功' : '保存成功',
         {
           confirmButtonText: '确定',
-          type: 'success'
+          type: reloadInfo?.error ? 'warning' : 'success',
+          dangerouslyUseHTMLString: false
         }
       )
       dbConfig.value = JSON.parse(JSON.stringify(dbForm.value))

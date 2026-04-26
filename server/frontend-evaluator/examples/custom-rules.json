@@ -1,0 +1,37 @@
+{
+  "rules": [
+    {
+      "id": "TEAM001",
+      "name": "Team-Specific Class Naming",
+      "description": "Enforce team-specific CSS class naming convention (prefix with 'team-')",
+      "category": "CODE_QUALITY",
+      "severity": "LOW",
+      "condition": "(ast, context) => {\n  // This is a placeholder condition\n  // In a real implementation, this would check CSS class names\n  return false;\n}",
+      "message": "CSS class does not follow team naming convention",
+      "recommendation": "Prefix CSS class names with 'team-' (e.g., 'team-button', 'team-header')",
+      "priority": 60
+    },
+    {
+      "id": "TEAM002",
+      "name": "No Inline Styles",
+      "description": "Prevent use of inline styles in HTML",
+      "category": "BEST_PRACTICES",
+      "severity": "MEDIUM",
+      "condition": "(ast, context) => {\n  // This is a placeholder condition\n  // In a real implementation, this would check for style attributes in HTML\n  return false;\n}",
+      "message": "Inline style attribute detected",
+      "recommendation": "Move styles to external CSS files or use CSS classes",
+      "priority": 70
+    },
+    {
+      "id": "TEAM003",
+      "name": "Image Size Validation",
+      "description": "Ensure images are properly sized for performance",
+      "category": "PERFORMANCE",
+      "severity": "HIGH",
+      "condition": "(ast, context) => {\n  // This is a placeholder condition\n  // In a real implementation, this would check image dimensions\n  return false;\n}",
+      "message": "Image may be too large for optimal performance",
+      "recommendation": "Resize images to appropriate dimensions and compress them",
+      "priority": 80
+    }
+  ]
+}

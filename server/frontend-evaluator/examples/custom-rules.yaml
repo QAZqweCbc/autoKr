@@ -1,0 +1,45 @@
+rules:
+  - id: TEAM004
+    name: Accessibility Color Contrast
+    description: Ensure text has sufficient color contrast for accessibility
+    category: ACCESSIBILITY
+    severity: HIGH
+    condition: |
+      (ast, context) => {
+        // This is a placeholder condition
+        // In a real implementation, this would check color contrast ratios
+        return false;
+      }
+    message: Text color contrast may not meet WCAG AA standards
+    recommendation: Adjust text or background colors to achieve minimum 4.5:1 contrast ratio
+    priority: 90
+
+  - id: TEAM005
+    name: Security Headers Check
+    description: Check for missing security headers in HTML
+    category: SECURITY
+    severity: CRITICAL
+    condition: |
+      (ast, context) => {
+        // This is a placeholder condition
+        // In a real implementation, this would check for security headers
+        return false;
+      }
+    message: Missing important security headers
+    recommendation: Add Content-Security-Policy, X-Content-Type-Options, and other security headers
+    priority: 100
+
+  - id: TEAM006
+    name: JavaScript Framework Best Practices
+    description: Enforce framework-specific best practices
+    category: BEST_PRACTICES
+    severity: MEDIUM
+    condition: |
+      (ast, context) => {
+        // This is a placeholder condition
+        // In a real implementation, this would check framework-specific patterns
+        return false;
+      }
+    message: Framework best practice violation detected
+    recommendation: Follow framework-specific coding guidelines and patterns
+    priority: 65

@@ -125,6 +125,7 @@ export interface Account {
   // 分组和标签
   groupId?: string
   tags?: string[]
+  ownerUserId?: string
 
   // 状态
   status: AccountStatus

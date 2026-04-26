@@ -13,16 +13,13 @@ import {
 
 const router = Router()
 
-// GET /api/config/browser - Get current browser configuration
+// ============================================
+// 浏览器配置路由（认证已禁用 - 个人使用）
+// ============================================
+
 router.get('/', getBrowserConfig)
-
-// PUT /api/config/browser - Update browser configuration
-router.put('/', updateBrowserConfig)
-
-// POST /api/config/browser/test - Test browser launch
-router.post('/test', testBrowserConfig)
-
-// GET /api/config/browser/detect - Detect available browsers
 router.get('/detect', detectBrowsers)
+router.put('/', updateBrowserConfig)
+router.post('/test', testBrowserConfig)
 
 export default router

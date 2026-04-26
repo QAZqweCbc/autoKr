@@ -15,8 +15,9 @@ import {
   updateClientUser,
   updateLastLogin
 } from '../services/client-user.service'
-import { MySQLAccountDB } from '../services/mysql.service'
-import { selectAvailableAccount, checkAccountAvailability } from '../services/token-availability.service'
+import { MySQLAccountDB, getPool } from '../services/mysql.service'
+import { isAccountAvailable } from '../services/token-availability.service'
+import { flatToAccount } from '../utils/account-mapper'
 
 /**
  * 管理员登录
@@ -116,13 +117,21 @@ export async function getPendingRequests(req: Request, res: Response) {
  * POST /api/admin/requests/:id/approve
  */
 export async function approveRequest(req: Request, res: Response) {
+  const connection = await getPool().getConnection()
+
   try {
     const { id } = req.params
     const adminId = (req as any).user.id
+    await connection.beginTransaction()
     
     // 1. 查询申请记录
-    const allocation = await TokenAllocationService.getById(id)
+    const [allocationRows] = await connection.execute(
+      'SELECT * FROM token_allocations WHERE id = ? FOR UPDATE',
+      [id]
+    )
+    const allocation = (allocationRows as any[])[0]
     if (!allocation) {
+      await connection.rollback()
       return res.status(404).json({
         success: false,
         message: '申请不存在'
@@ -130,6 +139,7 @@ export async function approveRequest(req: Request, res: Response) {
     }
     
     if (allocation.status !== 'pending') {
+      await connection.rollback()
       return res.status(400).json({
         success: false,
         message: '申请已处理'
@@ -137,16 +147,26 @@ export async function approveRequest(req: Request, res: Response) {
     }
     
     // 2. 检查用户当前配额
-    const user = await findClientUserById(allocation.user_id)
+    const [userRows] = await connection.execute(
+      'SELECT id, max_tokens FROM client_users WHERE id = ? FOR UPDATE',
+      [allocation.user_id]
+    )
+    const user = (userRows as any[])[0]
     if (!user) {
+      await connection.rollback()
       return res.status(404).json({
         success: false,
         message: '用户不存在'
       })
     }
     
-    const activeCount = await TokenAllocationService.countActiveByUserId(allocation.user_id)
+    const [activeCountRows] = await connection.execute(
+      'SELECT COUNT(*) as count FROM token_allocations WHERE user_id = ? AND status = ?',
+      [allocation.user_id, 'active']
+    )
+    const activeCount = Number((activeCountRows as any[])[0]?.count || 0)
     if (activeCount >= user.max_tokens) {
+      await connection.rollback()
       return res.status(400).json({
         success: false,
         message: `用户已达最大配额(${user.max_tokens}个)`
@@ -154,8 +174,14 @@ export async function approveRequest(req: Request, res: Response) {
     }
     
     // 3. 选择可用账户
-    const account = await selectAvailableAccount()
+    const [accountRows] = await connection.execute(
+      "SELECT * FROM accounts WHERE status = 'active' ORDER BY created_at ASC FOR UPDATE"
+    )
+    const account = (accountRows as any[])
+      .map(row => flatToAccount(row))
+      .find(candidate => isAccountAvailable(candidate))
     if (!account) {
+      await connection.rollback()
       return res.status(400).json({
         success: false,
         message: '暂无可用账户'
@@ -173,31 +199,47 @@ export async function approveRequest(req: Request, res: Response) {
     // }
     
     // 5. 更新分配记录和账户状态
-    await TokenAllocationService.update(id, {
-      account_id: account.id,
-      status: 'active',
-      approved_at: Date.now(),
-      approved_by: adminId
-    })
+    const approvedAt = Date.now()
+
+    await connection.execute(
+      `UPDATE token_allocations
+       SET account_id = ?, status = ?, approved_at = ?, approved_by = ?
+       WHERE id = ?`,
+      [account.id, 'active', approvedAt, adminId, id]
+    )
     
-    await MySQLAccountDB.update(account.id, {
-      status: 'assigned'
-    })
+    await connection.execute(
+      'UPDATE accounts SET status = ? WHERE id = ?',
+      ['assigned', account.id]
+    )
     
     // 6. 返回结果
-    const updatedAllocation = await TokenAllocationService.getById(id)
+    await connection.commit()
     
     res.json({
       success: true,
-      allocation: updatedAllocation
+      allocation: {
+        ...allocation,
+        account_id: account.id,
+        status: 'active',
+        approved_at: approvedAt,
+        approved_by: adminId
+      }
     })
   } catch (error: any) {
+    try {
+      await connection.rollback()
+    } catch {
+      // Ignore rollback failures and surface the original error.
+    }
     console.error('[Approve Request] Error:', error)
     res.status(500).json({
       success: false,
       message: '审批失败',
       error: error.message
     })
+  } finally {
+    connection.release()
   }
 }
 
@@ -240,6 +282,119 @@ export async function rejectRequest(req: Request, res: Response) {
     })
   } catch (error: any) {
     console.error('[Reject Request] Error:', error)
+    res.status(500).json({
+      success: false,
+      message: '拒绝失败',
+      error: error.message
+    })
+  }
+}
+
+/**
+ * 查看待审批的释放申请
+ * GET /api/admin/revoke-requests/pending
+ */
+export async function getPendingRevokeRequests(req: Request, res: Response) {
+  try {
+    const requests = await TokenAllocationService.getPendingRevokeRequests()
+
+    res.json({
+      success: true,
+      requests
+    })
+  } catch (error: any) {
+    console.error('[Get Pending Revoke Requests] Error:', error)
+    res.status(500).json({
+      success: false,
+      message: '查询失败',
+      error: error.message
+    })
+  }
+}
+
+/**
+ * 批准释放申请
+ * POST /api/admin/revoke-requests/:id/approve
+ */
+export async function approveRevokeRequest(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    const adminId = (req as any).user.id
+
+    const allocation = await TokenAllocationService.getById(id)
+    if (!allocation) {
+      return res.status(404).json({
+        success: false,
+        message: '申请不存在'
+      })
+    }
+
+    if (allocation.status !== 'active' || !allocation.revoke_reason) {
+      return res.status(400).json({
+        success: false,
+        message: '无效的释放申请'
+      })
+    }
+
+    await TokenAllocationService.update(id, {
+      status: 'revoked',
+      revoked_at: Date.now(),
+      revoked_by: adminId
+    })
+
+    if (allocation.account_id) {
+      await MySQLAccountDB.update(allocation.account_id, {
+        status: 'active'
+      })
+    }
+
+    res.json({
+      success: true,
+      message: '释放申请已批准'
+    })
+  } catch (error: any) {
+    console.error('[Approve Revoke Request] Error:', error)
+    res.status(500).json({
+      success: false,
+      message: '批准失败',
+      error: error.message
+    })
+  }
+}
+
+/**
+ * 拒绝释放申请
+ * POST /api/admin/revoke-requests/:id/reject
+ */
+export async function rejectRevokeRequest(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+
+    const allocation = await TokenAllocationService.getById(id)
+    if (!allocation) {
+      return res.status(404).json({
+        success: false,
+        message: '申请不存在'
+      })
+    }
+
+    if (allocation.status !== 'active' || !allocation.revoke_reason) {
+      return res.status(400).json({
+        success: false,
+        message: '无效的释放申请'
+      })
+    }
+
+    await TokenAllocationService.update(id, {
+      revoke_reason: null
+    })
+
+    res.json({
+      success: true,
+      message: '释放申请已拒绝'
+    })
+  } catch (error: any) {
+    console.error('[Reject Revoke Request] Error:', error)
     res.status(500).json({
       success: false,
       message: '拒绝失败',
@@ -365,7 +520,7 @@ export async function updateUserQuota(req: Request, res: Response) {
     const { id } = req.params
     const { max_tokens } = req.body
     
-    if (!max_tokens || max_tokens < 0) {
+    if (max_tokens === undefined || max_tokens === null || max_tokens < 0) {
       return res.status(400).json({
         success: false,
         message: '配额必须大于等于0'
@@ -569,125 +724,6 @@ export async function getAccountDetails(req: Request, res: Response) {
 
 
 /**
- * 查看待审批的释放申请
- * GET /api/admin/revoke-requests/pending
- */
-export async function getPendingRevokeRequests(req: Request, res: Response) {
-  try {
-    const requests = await TokenAllocationService.getPendingRevokeRequests()
-    
-    res.json({
-      success: true,
-      requests
-    })
-  } catch (error: any) {
-    console.error('[Get Pending Revoke Requests] Error:', error)
-    res.status(500).json({
-      success: false,
-      message: '查询失败',
-      error: error.message
-    })
-  }
-}
-
-/**
- * 批准释放申请
- * POST /api/admin/revoke-requests/:id/approve
- */
-export async function approveRevokeRequest(req: Request, res: Response) {
-  try {
-    const { id } = req.params
-    const adminId = (req as any).user.id
-    
-    // 1. 查询分配记录
-    const allocation = await TokenAllocationService.getById(id)
-    if (!allocation) {
-      return res.status(404).json({
-        success: false,
-        message: '申请不存在'
-      })
-    }
-    
-    if (allocation.status !== 'active' || !allocation.revoke_reason) {
-      return res.status(400).json({
-        success: false,
-        message: '无效的释放申请'
-      })
-    }
-    
-    // 2. 更新分配记录
-    await TokenAllocationService.update(id, {
-      status: 'revoked',
-      revoked_at: Date.now(),
-      revoked_by: adminId
-    })
-    
-    // 3. 释放账号
-    if (allocation.account_id) {
-      await MySQLAccountDB.update(allocation.account_id, {
-        status: 'active'
-      })
-    }
-    
-    res.json({
-      success: true,
-      message: '释放申请已批准'
-    })
-  } catch (error: any) {
-    console.error('[Approve Revoke Request] Error:', error)
-    res.status(500).json({
-      success: false,
-      message: '批准失败',
-      error: error.message
-    })
-  }
-}
-
-/**
- * 拒绝释放申请
- * POST /api/admin/revoke-requests/:id/reject
- */
-export async function rejectRevokeRequest(req: Request, res: Response) {
-  try {
-    const { id } = req.params
-    const { reason } = req.body
-    
-    // 1. 查询分配记录
-    const allocation = await TokenAllocationService.getById(id)
-    if (!allocation) {
-      return res.status(404).json({
-        success: false,
-        message: '申请不存在'
-      })
-    }
-    
-    if (allocation.status !== 'active' || !allocation.revoke_reason) {
-      return res.status(400).json({
-        success: false,
-        message: '无效的释放申请'
-      })
-    }
-    
-    // 2. 清除释放理由（拒绝释放）
-    await TokenAllocationService.update(id, {
-      revoke_reason: null
-    })
-    
-    res.json({
-      success: true,
-      message: '释放申请已拒绝'
-    })
-  } catch (error: any) {
-    console.error('[Reject Revoke Request] Error:', error)
-    res.status(500).json({
-      success: false,
-      message: '拒绝失败',
-      error: error.message
-    })
-  }
-}
-
-/**
  * Token池统计
  * GET /api/admin/stats/pool
  */
@@ -796,9 +832,9 @@ export async function refreshAllAccounts(req: Request, res: Response) {
  */
 export async function getAccountPoolStatus(req: Request, res: Response) {
   try {
-    const { getAccountPoolStatus } = await import('../services/account-pool.service')
-    const status = await getAccountPoolStatus()
-    
+    const { getAccountPoolStatus: getStatus } = await import('../services/account-pool.service')
+    const status = await getStatus()
+
     res.json({
       success: true,
       status
@@ -821,7 +857,7 @@ export async function replenishAccountPool(req: Request, res: Response) {
   try {
     const { checkAndReplenishPool } = await import('../services/account-pool.service')
     await checkAndReplenishPool()
-    
+
     res.json({
       success: true,
       message: '账号池补充任务已触发'

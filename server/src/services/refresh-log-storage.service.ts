@@ -46,6 +46,7 @@ export interface RefreshLogStorage {
  * MySQL 存储实现
  */
 class MySQLRefreshLogStorage implements RefreshLogStorage {
+  private readonly fallbackStorage = new JSONRefreshLogStorage()
   async save(log: RefreshLog): Promise<void> {
     const pool = getPool()
     const connection = await pool.getConnection()

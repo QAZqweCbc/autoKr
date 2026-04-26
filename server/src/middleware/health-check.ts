@@ -138,13 +138,58 @@ export const metricsCollector = new MetricsCollector()
 async function checkDatabaseHealth(): Promise<ServiceHealth> {
   try {
     const start = Date.now()
-    // 这里应该调用实际的数据库检查
-    // 示例：await db.ping()
-    const responseTime = Date.now() - start
     
-    return {
-      status: 'up',
-      responseTime
+    // 检查数据库连接状态
+    const { getStorageMode } = await import('../services/database.adapter')
+    const storageMode = getStorageMode()
+    
+    if (storageMode === 'mysql') {
+      // MySQL 健康检查
+      const { getPool } = await import('../services/mysql.service')
+      try {
+        const pool = getPool()
+        const connection = await pool.getConnection()
+        await connection.ping()
+        connection.release()
+        
+        const responseTime = Date.now() - start
+        return {
+          status: 'up',
+          responseTime
+        }
+      } catch (error: any) {
+        logger.error('MySQL health check failed', { error: error.message })
+        return {
+          status: 'down',
+          error: error.message
+        }
+      }
+    } else if (storageMode === 'redis') {
+      // Redis 健康检查
+      const { getRedis } = await import('../services/redis.service')
+      try {
+        const client = getRedis()
+        await client.ping()
+        
+        const responseTime = Date.now() - start
+        return {
+          status: 'up',
+          responseTime
+        }
+      } catch (error: any) {
+        logger.error('Redis health check failed', { error: error.message })
+        return {
+          status: 'down',
+          error: error.message
+        }
+      }
+    } else {
+      // JSON 存储模式（文件系统）
+      const responseTime = Date.now() - start
+      return {
+        status: 'up',
+        responseTime
+      }
     }
   } catch (error: any) {
     logger.error('Database health check failed', { error: error.message })

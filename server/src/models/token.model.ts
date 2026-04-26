@@ -23,3 +23,9 @@ export interface AccountResponse {
   }
   message?: string
 }
+
+export interface OidcTokenResponse {
+  accessToken: string
+  refreshToken?: string
+  expiresIn?: number
+}
