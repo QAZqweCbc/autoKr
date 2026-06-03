@@ -8,9 +8,9 @@
     "database": "KrioServer"
   },
   "redis": {
-    "host": "",
-    "port": 6379,
-    "password": "",
+    "host": "192.168.226.128",
+    "port": 6380,
+    "password": "123456",
     "db": 0
   }
 }

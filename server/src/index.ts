@@ -200,7 +200,16 @@ async function start() {
     logger.info('='.repeat(60))
     logger.info('🚀 Kiro Account Manager Server - 启动中...')
     logger.info('='.repeat(60))
-    
+
+    // 预启动数据库检查
+    const { performPreStartupCheck } = await import('./services/pre-startup-check.service')
+    const preCheckResult = await performPreStartupCheck()
+
+    // 如果预检结果建议降级到 JSON，强制使用 JSON 模式
+    if (preCheckResult.storageMode === 'json' && preCheckResult.warnings.length > 0) {
+      forceJsonFallback('预启动检查建议使用 JSON 模式')
+    }
+
     // 初始化数据库
     logger.info('📦 初始化数据库...')
     try {

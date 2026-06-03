@@ -111,7 +111,16 @@ async function start() {
     console.log('\n' + '='.repeat(60))
     console.log('🚀 Kiro 注册认证服务 - 启动中...')
     console.log('='.repeat(60))
-    
+
+    // 预启动数据库检查
+    const { performPreStartupCheck } = await import('../services/pre-startup-check.service')
+    const preCheckResult = await performPreStartupCheck()
+
+    // 如果预检结果建议降级到 JSON，强制使用 JSON 模式
+    if (preCheckResult.storageMode === 'json' && preCheckResult.warnings.length > 0) {
+      forceJsonFallback('预启动检查建议使用 JSON 模式')
+    }
+
     // 初始化数据库
     console.log('\n📦 初始化数据库...')
     try {

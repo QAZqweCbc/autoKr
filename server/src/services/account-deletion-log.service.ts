@@ -49,6 +49,15 @@ export interface DeletionStats {
  * 创建账号删除日志表
  */
 export async function createDeletionLogTable(): Promise<void> {
+  // 检查存储模式，仅在 MySQL 模式下才创建表
+  const { getStorageMode } = await import('./database.adapter')
+  const storageMode = getStorageMode()
+
+  if (storageMode !== 'mysql') {
+    console.log(`ℹ️  当前存储模式为 ${storageMode.toUpperCase()}，跳过账号删除日志表创建`)
+    return
+  }
+
   const pool = getPool()
   const connection = await pool.getConnection()
 
