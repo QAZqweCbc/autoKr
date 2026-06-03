@@ -4,7 +4,7 @@
  */
 
 import { Account } from '../models/account.model'
-import { MySQLAccountDB } from './mysql.service'
+import { MySQLAccountDBNew as MySQLAccountDB } from './mysql-account.service'
 import { syncAccountUsage } from './kiro-api.service'
 import { updateAccountUsage } from '../utils/account-mapper'
 

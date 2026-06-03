@@ -6,7 +6,7 @@
 import { TokenAllocationService } from './token-allocation.service'
 import { findClientUserById } from './client-user.service'
 import { selectAvailableAccount } from './token-availability.service'
-import { MySQLAccountDB } from './mysql.service'
+import { MySQLAccountDBNew as MySQLAccountDB } from './mysql-account.service'
 import { triggerAccountGeneration, getAccountPoolStatus } from './account-pool.service'
 import { emitSystemMessage, emitAdminRefreshRequests, emitAdminRefreshRevokeRequests, emitAdminRefreshAllocations } from '../websocket/socket.handler'
 

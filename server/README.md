@@ -157,25 +157,31 @@ pm2 start ecosystem.config.js
 
 ---
 
-## 📚 文档
+## 📚 重要修复记录
 
-### 快速入门
-- [快速开始指南](QUICK_START.md) - 5分钟快速上手
-- [部署快速参考](DEPLOYMENT_QUICK_REFERENCE.md) - 常用命令速查
+### SSO Token 字段映射修复
+**修复日期**: 2025-05-30
 
-### 部署文档
-- [Linux部署指南](LINUX_DEPLOYMENT.md) - 完整的Linux部署步骤
-- [部署脚本说明](#部署脚本) - 自动化部署脚本使用
+**问题**: `x_amz_sso_authn` 的值_token` 字段，导致后续刷新 token 时数据丢失。
 
-### 项目文档
-- [项目状态报告](PROJECT_STATUS.md) - 当前项目状态和功能清单
-- [安全审计报告](SECURITY_AUDIT.md) - 安全审计详细报告
-- [审计总结](AUDIT_SUMMARY.md) - 审计结果摘要
+**修复内容**:
+- ✅ 修复 `updateOAuthCredentials` 方法，显式保留 `ssoToken` 字段
+- ✅ 所有刷新逻辑都传递完整的 `access_token` 和 `refresh_token`
+- ✅ 移除危险的字段回退逻辑
+- ✅ 提供数据修复脚本：`npm run fix:sso-mapping`
 
-### 系统文档
-- [自动审批系统](docs/AUTO_APPROVAL_SYSTEM.md) - 自动审批功能说明
-- [优化指南](docs/OPTIMIZATION_GUIDE.md) - 性能优化建议
-- [代码审计报告](docs/CODE_AUDIT_REPORT.md) - 代码质量审计
+**影响文件**: 11个核心文件已修复
+
+### 安全审计完成
+**审计日期**: 2026-04-12
+
+**已修复的高危问题**:
+- ✅ 硬编码管理员密码（改为随机生成）
+- ✅ JWT 密钥默认值（强制设置环境变量）
+- ✅ 敏感信息泄露（Token 输出脱敏）
+- ✅ SQL 注入防护（全部使用参数化查询）
+
+**安全评分**: 🟢 良好
 
 ---
 

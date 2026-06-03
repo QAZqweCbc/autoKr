@@ -65,7 +65,7 @@ function loadData() {
           visitorId: acc.visitor_id,
           
           credentials: {
-            accessToken: acc.access_token || acc.x_amz_sso_authn || '',
+            accessToken: acc.access_token || '',  // 移除回退到 x_amz_sso_authn 的逻辑
             csrfToken: acc.csrf_token,
             refreshToken: acc.refresh_token,
             ssoToken: acc.x_amz_sso_authn,
@@ -399,6 +399,7 @@ export const AccountDB = {
   },
 
   updateOAuthCredentials(id: string, credentials: {
+    access_token?: string
     refresh_token?: string
     client_id?: string
     client_secret?: string
@@ -406,6 +407,8 @@ export const AccountDB = {
   }) {
     const account = dataStore.accounts.find(a => a.id === id)
     if (account) {
+      // 显式保留 ssoToken（JSON 模式下已经在内存对象中）
+      if (credentials.access_token !== undefined) account.credentials.accessToken = credentials.access_token
       if (credentials.refresh_token !== undefined) account.credentials.refreshToken = credentials.refresh_token
       if (credentials.client_id !== undefined) account.credentials.clientId = credentials.client_id
       if (credentials.client_secret !== undefined) account.credentials.clientSecret = credentials.client_secret

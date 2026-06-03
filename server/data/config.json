@@ -3,43 +3,26 @@
     "browserType": "chrome",
     "browserPath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     "headless": true,
-    "showWindow": true,
+    "showWindow": false,
     "args": [
-      "--disable-gpu"
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-software-rasterizer",
+      "--disable-extensions"
     ],
-    "delayMin": 5,
-    "delayMax": 10
+    "delayMin": 3,
+    "delayMax": 8
   },
   "generator": {
     "defaultCount": 1,
-    "defaultEmailLength": 12,
+    "defaultEmailLength": 8,
     "defaultPasswordLength": 12
-  },
-  "storage": "mysql",
-  "mysql": {
-    "host": "192.168.226.128",
-    "port": 1214,
-    "user": "admin",
-    "password": "cbc123456",
-    "database": "KrioServer"
-  },
-  "redis": {
-    "host": "192.168.226.128",
-    "port": 6380,
-    "password": "123456",
-    "db": 0
-  },
-  "email": {
-    "qqEmail": "2053359996@qq.com",
-    "authCode": "zqmfznvdgffkdcah",
-    "domains": "@xinc.shop,@qqximi.store,@kasxi.site",
-    "useAlias": false
   },
   "autoRefresh": {
     "enabled": false,
-    "interval": 60,
-    "concurrency": 2,
-    "lastRefreshTime": "2026-02-17T06:20:12.052Z",
+    "interval": 30,
+    "concurrency": 10,
+    "lastRefreshTime": null,
     "refreshBeforeExpiry": 5,
     "maxConsecutiveFailures": 3,
     "retryFailedAfter": 24,

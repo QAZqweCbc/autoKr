@@ -8,7 +8,7 @@ import { OidcTokenResponse } from '../../models/token.model'
 import { v4 as uuidv4 } from 'uuid'
 import { TokenAllocationService } from '../../services/token-allocation.service'
 import { findClientUserById } from '../../services/client-user.service'
-import { MySQLAccountDB } from '../../services/mysql.service'
+import { MySQLAccountDBNew as MySQLAccountDB } from '../../services/mysql-account.service'
 import { updateAccountUsage } from '../../utils/account-mapper'
 
 /**
@@ -362,9 +362,10 @@ export async function refreshToken(req: Request, res: Response) {
         // 更新Token到数据库
         await MySQLAccountDB.updateAccessToken(accountId, data.accessToken)
         
-        // 如果返回了新的refresh_token，也更新它
+        // 如果返回了新的refresh_token，也更新它和 access_token
         if (data.refreshToken && data.refreshToken !== account.credentials.refreshToken) {
           await MySQLAccountDB.updateOAuthCredentials(accountId, {
+            access_token: data.accessToken,
             refresh_token: data.refreshToken
           })
         }

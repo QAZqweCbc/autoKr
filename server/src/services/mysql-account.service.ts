@@ -283,7 +283,7 @@ export const MySQLAccountDBNew = {
     const connection = await getPool().getConnection()
     try {
       const [rows] = await connection.execute(`
-        SELECT 
+        SELECT
           DATE(FROM_UNIXTIME(created_at / 1000)) as date,
           COUNT(*) as total,
           SUBSTRING_INDEX(email, '@', -1) as domain
@@ -296,5 +296,47 @@ export const MySQLAccountDBNew = {
     } finally {
       connection.release()
     }
+  },
+
+  /**
+   * 更新 Access Token（便捷方法）
+   */
+  async updateAccessToken(id: string, accessToken: string): Promise<void> {
+    const account = await this.getById(id)
+    if (!account) {
+      throw new Error(`Account ${id} not found`)
+    }
+
+    await this.update(id, {
+      credentials: {
+        ...account.credentials,
+        accessToken
+      }
+    } as any)
+  },
+
+  /**
+   * 更新 OAuth 凭证（便捷方法）
+   */
+  async updateOAuthCredentials(id: string, credentials: { access_token: string; refresh_token: string }): Promise<void> {
+    const account = await this.getById(id)
+    if (!account) {
+      throw new Error(`Account ${id} not found`)
+    }
+
+    await this.update(id, {
+      credentials: {
+        ...account.credentials,
+        accessToken: credentials.access_token,
+        refreshToken: credentials.refresh_token
+      }
+    } as any)
+  },
+
+  /**
+   * 更新扩展信息（别名方法，兼容旧代码）
+   */
+  async updateExtendedInfo(id: string, syncData: any): Promise<void> {
+    return this.updateUsageInfo(id, syncData)
   }
 }

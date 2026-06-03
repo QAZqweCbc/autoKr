@@ -98,9 +98,10 @@ export async function getAccountUsage(req: Request, res: Response) {
         // 更新Token到数据库
         await AccountDB.updateAccessToken(id as string, data.accessToken)
         
-        // 如果返回了新的refresh_token，也更新它
+        // 如果返回了新的refresh_token，也更新它和 access_token
         if (data.refreshToken && data.refreshToken !== account.credentials.refreshToken) {
           await AccountDB.updateOAuthCredentials(id as string, {
+            access_token: data.accessToken,
             refresh_token: data.refreshToken
           })
         }

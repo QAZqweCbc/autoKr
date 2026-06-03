@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { AccountDB } from '../services/database.adapter'
 import { TokenSubmitDTO, AccountRequestDTO, OidcTokenResponse } from '../models/token.model'
 import { ImportFromAppDTO, Account } from '../models/account.model'
+import { validateAccessToken, logTokenValidation } from '../utils/token-validator'
 
 /**
  * 提交 SSO Token
@@ -316,6 +317,15 @@ async function ssoDeviceAuth(bearerToken: string, region: string = 'us-east-1'):
       if (tokenRes.ok) {
         const tokenData = await tokenRes.json() as { accessToken: string; refreshToken: string; expiresIn?: number }
         console.log('[SSO] Token obtained successfully!')
+
+        // ✅ 验证 Access Token 格式
+        const validation = validateAccessToken(tokenData.accessToken)
+        logTokenValidation('SSO Device Auth - Access Token', tokenData.accessToken, validation)
+
+        if (!validation.valid) {
+          console.error('[SSO] ⚠️  获取的 Access Token 格式异常，但仍然继续（可能是新格式）')
+        }
+
         return {
           success: true,
           accessToken: tokenData.accessToken,
@@ -419,12 +429,13 @@ export async function refreshToken(req: Request, res: Response) {
       // ✅ 只更新 access_token，保留原始的 sso_token
       await AccountDB.updateAccessToken(id as string, data.accessToken)
       
-      // 如果返回了新的refresh_token，也更新它
+      // 如果返回了新的refresh_token，也更新它和 access_token
       if (data.refreshToken && data.refreshToken !== account.credentials.refreshToken) {
         await AccountDB.updateOAuthCredentials(id as string, {
+          access_token: data.accessToken,
           refresh_token: data.refreshToken
         })
-        console.log(`[OIDC] Refresh token also updated`)
+        console.log(`[OIDC] Access token and refresh token updated`)
       }
       
       // 🆕 刷新成功后，同步使用量信息
@@ -681,14 +692,64 @@ export async function syncAccountUsage(req: Request, res: Response) {
     }
     
     console.log(`[Sync] Syncing usage for: ${account.email}`)
-    
+
+    // ✅ 主动检测 Token 格式，错误格式提前刷新
+    const { validateAccessToken } = await import('../utils/token-validator')
+    const validation = validateAccessToken(account.credentials.accessToken)
+
+    let currentAccessToken = account.credentials.accessToken
+
+    // 如果 Token 格式错误且有刷新凭证，主动刷新
+    if (!validation.valid && account.credentials.refreshToken && account.credentials.clientId) {
+      console.log(`[Sync] ⚠️  检测到错误的 Token 格式 (${validation.type})，主动刷新...`)
+      console.log(`[Sync] 问题: ${validation.issue}`)
+
+      const region = account.credentials.region || 'us-east-1'
+      const url = `https://oidc.${region}.amazonaws.com/token`
+
+      try {
+        const refreshResponse = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientId: account.credentials.clientId,
+            clientSecret: account.credentialet,
+            refreshToken: account.credentials.refreshToken,
+            grantType: 'refresh_token'
+          })
+        })
+
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json() as OidcTokenResponse
+          console.log(`[Sync] ✅ Token 刷新成功，长度: ${refreshData.accessToken.length}`)
+
+          // 验证新 Token
+          const newValidation = validateAccessToken(refreshData.accessToken)
+          if (newValidation.valid) {
+            console.log(`[Sync] ✅ 新 Token 格式正确 (${newValidation.type})`)
+          } else {
+            console.log(`[Sync] ⚠️  新 Token 格式仍然异常: ${newValidation.issue}`)
+          }
+
+          // 更新数据库
+          await AccountDB.updateAccessToken(id as string, refreshData.accessToken)
+          currentAccessToken = refreshData.accessToken
+        } else {
+          console.log(`[Sync] ❌ Token 刷新失败: ${refreshResponse.status}`)
+        }
+      } catch (refreshError: any) {
+        console.error(`[Sync] Token 刷新异常:`, refreshError.message)
+      }
+    }
+
+    // 使用当前 Token（可能是刚刷新的）调用 API
     const { syncAccountUsage: syncUsage } = await import('../services/kiro-api.service')
-    const result = await syncUsage(account.credentials.accessToken, account.idp)
-    
+    const result = await syncUsage(currentAccessToken, account.idp)
+
     if (!result.success) {
-      // 如果是 401 错误，尝试刷新 Token 后重试
-      if (result.error?.includes('401') && account.credentials.refreshToken && account.credentials.clientId) {
-        console.log(`[Sync] Token expired, refreshing...`)
+      // 如果还是 401 错误，再尝试刷新一次（兜底逻辑）
+      if (result.error?.includes('401') && account.credentials.refreshToken && account.credentials.clientId && currentAccessToken === account.credentials.accessToken) {
+        console.log(`[Sync] API 调用失败 401，再次尝试刷新 Token...`)
         
         // 刷新 Token
         const region = account.credentials.region || 'us-east-1'

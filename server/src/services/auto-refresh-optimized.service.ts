@@ -25,11 +25,21 @@ import {
   emitRefreshAccount,
   emitRefreshComplete
 } from '../websocket/socket.handler'
-import { 
-  KIRO_AUTH_ENDPOINT, 
-  REFRESH_CONFIG, 
-  TIMEOUT_CONFIG 
+import { RefreshErrorChain } from '../utils/error-chain'
+import {
+  KIRO_AUTH_ENDPOINT,
+  REFRESH_CONFIG,
+  TIMEOUT_CONFIG
 } from '../config/constants'
+// 新增：导入优化服务
+import { LockManagerFactory, withLock } from './distributed-lock.service'
+import { createRefreshPriorityQueue } from './priority-queue.service'
+import {
+  backoffManager,
+  recordRefreshFailure,
+  recordRefreshSuccess,
+  filterRetryableAccounts
+} from './exponential-backoff.service'
 
 // 常量配置（使用全局配置）
 const TOKEN_REFRESH_BEFORE_EXPIRY = REFRESH_CONFIG.TOKEN_EXPIRY_BUFFER
@@ -199,21 +209,74 @@ async function performAutoRefresh(): Promise<RefreshResult> {
       details: []
     }
   }
-  
+
   isRefreshing = true
   const startTime = Date.now()
-  
+
   // 创建日志记录器
   const logger = createRefreshLogger()
-  
+
   console.log(`\n${'='.repeat(60)}`)
   console.log(`🔄 开始智能刷新 Token - ${new Date().toLocaleString('zh-CN')}`)
   console.log('='.repeat(60))
-  
+
   try {
     const config = loadConfig()
     const concurrency = config.autoRefresh?.concurrency || 10
     const enableWebSocket = config.autoRefresh?.enableWebSocket ?? false
+
+    // 🆕 新增：分布式锁配置
+    const lockConfig = config.autoRefresh?.distributedLock || { enabled: false }
+    const backoffConfig = config.autoRefresh?.exponentialBackoff || { enabled: false }
+    const priorityQueueConfig = config.autoRefresh?.priorityQueue || { enabled: false }
+
+    // 🆕 新增：使用分布式锁防止多实例重复刷新
+    if (lockConfig.enabled) {
+      console.log('🔒 尝试获取分布式锁...')
+      const lock = LockManagerFactory.createLock({
+        key: 'token_refresh_lock',
+        ttl: lockConfig.ttl || 600_000,
+        retryDelay: lockConfig.retryDelay || 1000,
+        retryTimes: lockConfig.retryTimes || 3
+      })
+
+      const result = await withLock(lock, async () => {
+        return await performRefreshWithOptimizations(
+          config,
+          concurrency,
+          enableWebSocket,
+          backoffConfig,
+          priorityQueueConfig,
+          logger,
+          startTime
+        )
+      })
+
+      if (!result) {
+        console.log('❌ 未能获取锁，其他实例正在刷新')
+        return {
+          totalAccounts: 0,
+          successCount: 0,
+          failedCount: 0,
+          skippedCount: 0,
+          duration: Date.now() - startTime,
+          details: []
+        }
+      }
+
+      return result
+    } else {
+      // 不使用分布式锁，直接执行
+      return await performRefreshWithOptimizations(
+        config,
+        concurrency,
+        enableWebSocket,
+        backoffConfig,
+        priorityQueueConfig,
+        logger,
+        startTime
+      )
+    }
     
     // 获取所有账号
     const allAccounts = await AccountDB.getAll()
@@ -446,22 +509,32 @@ function needsRefresh(account: Account): boolean {
 
 /**
  * 检查是否应该跳过账号
+ *
+ * 关键原则：只跳过明确已封禁的账号，不根据失败次数永久跳过
+ * 因为失败可能是临时网络问题，需要通过实际检查来确认账号状态
  */
 function shouldSkipAccount(account: Account): { skip: boolean; reason?: string } {
-  // 跳过已封禁账号（多种检测方式）
-  const lastError = account.lastError || ''
-  
-  // 方式1: 检查错误信息中的关键词
-  if (lastError.includes('AccountSuspendedException') || 
-      lastError.includes('UnauthorizedException')) {
-    return { skip: true, reason: '账号已封禁' }
+  // 1. 跳过缺少必要凭证的账号（无法刷新）
+  if (!account.credentials.refreshToken ||
+      !account.credentials.clientId ||
+      !account.credentials.clientSecret) {
+    return { skip: true, reason: '缺少OAuth凭证' }
   }
-  
+
+  // 2. 检查是否明确标记为已封禁
+  const lastError = account.lastError || ''
+
+  // 方式1: 检查确定的封禁错误
+  if (lastError.includes('AccountSuspendedException') ||
+      lastError.includes('UnauthorizedException')) {
+    return { skip: true, reason: '账号已封禁（确认）' }
+  }
+
   // 方式2: 检查HTTP状态码423（Locked）
   if (lastError.includes('423') || lastError.includes('Locked')) {
-    return { skip: true, reason: '账号已锁定' }
+    return { skip: true, reason: '账号已锁定（确认）' }
   }
-  
+
   // 方式3: 检查常见的封禁错误消息
   const bannedKeywords = [
     'suspended',
@@ -471,34 +544,163 @@ function shouldSkipAccount(account: Account): { skip: boolean; reason?: string }
     'account is not active',
     'account has been suspended'
   ]
-  
+
   const lowerError = lastError.toLowerCase()
   for (const keyword of bannedKeywords) {
     if (lowerError.includes(keyword)) {
-      return { skip: true, reason: `账号已封禁 (${keyword})` }
+      return { skip: true, reason: `账号已封禁（${keyword}）` }
     }
   }
-  
-  // 跳过连续失败次数过多的账号
-  if (account.consecutiveFailures && account.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-    return { skip: true, reason: `连续失败${account.consecutiveFailures}次` }
-  }
-  
-  // 跳过缺少OAuth凭证的账号
-  if (!account.credentials.refreshToken || 
-      !account.credentials.clientId || 
-      !account.credentials.clientSecret) {
-    return { skip: true, reason: '缺少OAuth凭证' }
-  }
-  
+
+  // 3. ❌ 移除：不再根据连续失败次数永久跳过
+  // 原因：失败可能是临时网络问题、API限流等，不代表账号被封
+  // 改进：使用指数退避延长重试间隔，但不永久放弃
+
+  // 所有其他情况都不跳过，允许重试
   return { skip: false }
 }
 
 /**
- * 批量刷新账号
+ * 批量刷新账号（带指数退避）
+ */
+export async function batchRefreshAccountsWithBackoff(
+  accounts: Account[],
+  concurrency: number,
+  logger: RefreshLogger,
+  enableWebSocket: boolean,
+  backoffEnabled: boolean = false
+): Promise<RefreshResult> {
+  let successCount = 0
+  let failedCount = 0
+  const details: RefreshDetail[] = []
+
+  // 分批处理
+  for (let i = 0; i < accounts.length; i += concurrency) {
+    const batch = accounts.slice(i, i + concurrency)
+    const batchNum = Math.floor(i / concurrency) + 1
+    const totalBatches = Math.ceil(accounts.length / concurrency)
+
+    console.log(`\n📦 处理批次 ${batchNum}/${totalBatches} (${batch.length} 个账号)`)
+
+    const results = await Promise.allSettled(
+      batch.map(account => refreshSingleAccount(account))
+    )
+
+    results.forEach((result, index) => {
+      const account = batch[index]
+
+      if (result.status === 'fulfilled') {
+        const detail = result.value
+        details.push(detail)
+
+        // 🆕 记录到指数退避管理器
+        if (backoffEnabled) {
+          if (detail.success) {
+            recordRefreshSuccess(account.id)
+          } else {
+            const backoffState = recordRefreshFailure(account.id)
+            console.log(
+              `  📊 [Backoff] ${account.email} - 失败 ${backoffState.consecutiveFailures} 次，` +
+              `下次重试: ${new Date(backoffState.nextRetryAt).toLocaleString('zh-CN')}`
+            )
+          }
+        }
+
+        // 记录到日志
+        logger.logAccountRefresh(detail)
+
+        // 发送账号刷新完成事件
+        if (enableWebSocket) {
+          emitRefreshAccount({
+            accountId: detail.accountId,
+            email: detail.email,
+            success: detail.success,
+            error: detail.error,
+            duration: detail.duration,
+            skipped: detail.skipped,
+            skipReason: detail.skipReason
+          })
+        }
+
+        if (detail.success) {
+          successCount++
+          console.log(`  ✅ [Token] ${account.email} - ${(detail.duration / 1000).toFixed(2)}s`)
+
+          // 检查同步结果
+          if (detail.syncSuccess) {
+            console.log(`     ✅ [Sync] 信息同步成功`)
+          } else if (detail.syncError) {
+            if (detail.syncError.includes('AccountSuspendedException') ||
+                detail.syncError.includes('UnauthorizedException')) {
+              console.error(`     🚫 [Sync] 账号已封禁: ${detail.syncError}`)
+            } else {
+              console.warn(`     ⚠️  [Sync] 信息同步失败: ${detail.syncError}`)
+            }
+          }
+        } else {
+          failedCount++
+          console.log(`  ❌ [Token] ${account.email} - ${detail.error}`)
+        }
+      } else {
+        failedCount++
+        const error = result.reason?.message || '未知错误'
+        const detail: RefreshDetail = {
+          accountId: account.id,
+          email: account.email,
+          success: false,
+          error,
+          duration: 0
+        }
+        details.push(detail)
+
+        // 🆕 记录到指数退避管理器
+        if (backoffEnabled) {
+          const backoffState = recordRefreshFailure(account.id)
+          console.log(
+            `  📊 [Backoff] ${account.email} - 失败 ${backoffState.consecutiveFailures} 次，` +
+            `下次重试: ${new Date(backoffState.nextRetryAt).toLocaleString('zh-CN')}`
+          )
+        }
+
+        // 记录到日志
+        logger.logAccountRefresh(detail)
+
+        // 发送账号刷新完成事件
+        if (enableWebSocket) {
+          emitRefreshAccount({
+            accountId: detail.accountId,
+            email: detail.email,
+            success: false,
+            error: detail.error,
+            duration: 0
+          })
+        }
+
+        console.log(`  ❌ [Token] ${account.email} - ${error}`)
+      }
+    })
+
+    // 批次间延迟，避免 API 限流
+    if (i + concurrency < accounts.length) {
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY))
+    }
+  }
+
+  return {
+    totalAccounts: 0, // 将在外部设置
+    successCount,
+    failedCount,
+    skippedCount: 0, // 将在外部设置
+    duration: 0, // 将在外部设置
+    details
+  }
+}
+
+/**
+ * 批量刷新账号（原有函数，保持兼容性）
  */
 async function batchRefreshAccounts(
-  accounts: Account[], 
+  accounts: Account[],
   concurrency: number,
   logger: RefreshLogger,
   enableWebSocket: boolean
@@ -647,119 +849,148 @@ async function refreshSingleAccount(account: Account): Promise<RefreshDetail> {
         newRefreshToken = response.data.refreshToken
         expiresIn = response.data.expiresIn || 3600
       } catch (firstError: any) {
-        // 🆕 如果第一次刷新失败（401错误），尝试重新获取 RefreshToken
-        if (firstError.response?.status === 401) {
-          console.log(`  🔄 [Retry] ${account.email} - RefreshToken 已失效，尝试重新获取...`)
-
-          // 检查是否有完整的 OAuth 凭证（clientId, clientSecret, refreshToken）
-          if (!account.credentials.clientId || !account.credentials.clientSecret || !account.credentials.refreshToken) {
-            throw new Error('缺少完整的 OAuth 凭证，无法尝试 AWS OIDC 刷新')
-          }
-
-          console.log(`  🔄 [Retry] ${account.email} - 尝试使用 AWS OIDC 端点刷新...`)
-          
-          try {
-            // 尝试使用 AWS OIDC 端点刷新（类似前端刷新按钮的逻辑）
-            const region = account.credentials.region || 'us-east-1'
-            const url = `https://oidc.${region}.amazonaws.com/token`
-            
-            const oidcResponse = await axios.post(
-              url,
-              {
-                clientId: account.credentials.clientId,
-                clientSecret: account.credentials.clientSecret,
-                refreshToken: account.credentials.refreshToken,
-                grantType: 'refresh_token'
-              },
-              {
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                timeout: 30000
-              }
-            )
-
-            if (!oidcResponse.data.accessToken) {
-              throw new Error('AWS OIDC 刷新失败：响应中缺少 accessToken')
-            }
-
-            newAccessToken = oidcResponse.data.accessToken
-            newRefreshToken = oidcResponse.data.refreshToken
-            expiresIn = oidcResponse.data.expiresIn || 3600
-            
-            console.log(`  ✅ [Retry] ${account.email} - AWS OIDC 刷新成功`)
-            
-            // 如果返回了新的 refresh_token，更新它
-            if (newRefreshToken && newRefreshToken !== account.credentials.refreshToken) {
-              await AccountDB.updateOAuthCredentials(account.id, {
-                refresh_token: newRefreshToken
-              })
-              console.log(`  ✅ [Retry] ${account.email} - RefreshToken 已更新`)
-            }
-          } catch (oidcError: any) {
-            console.error(`  ❌ [Retry] ${account.email} - AWS OIDC 刷新失败: ${oidcError.message}`)
-            
-            // AWS OIDC 也失败了，检查是否有 SSO Token 可以尝试
-            if (account.credentials.ssoToken) {
-              console.log(`  🔄 [Retry] ${account.email} - 尝试使用 SSO Token 重新获取...`)
-              
-              try {
-                // 使用 SSO Token 重新获取 RefreshToken
-                const reAuthResponse = await axios.post(
-                  `${KIRO_AUTH_ENDPOINT}/refreshToken`,
-                  { refreshToken: account.credentials.ssoToken },
-                  {
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'User-Agent': 'kiro-account-manager/1.0.0'
-                    },
-                    timeout: 30000
-                  }
-                )
-
-                if (!reAuthResponse.data.accessToken || !reAuthResponse.data.refreshToken) {
-                  throw new Error('重新获取 Token 失败：响应中缺少必要字段')
-                }
-
-                // 更新 RefreshToken
-                const newRefreshTokenFromReAuth = reAuthResponse.data.refreshToken
-                await AccountDB.updateOAuthCredentials(account.id, {
-                  refresh_token: newRefreshTokenFromReAuth
-                })
-                console.log(`  ✅ [Retry] ${account.email} - RefreshToken 已更新`)
-
-                // 使用新的 RefreshToken 再次尝试刷新
-                const retryResponse = await axios.post(
-                  `${KIRO_AUTH_ENDPOINT}/refreshToken`,
-                  { refreshToken: newRefreshTokenFromReAuth },
-                  {
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'User-Agent': 'kiro-account-manager/1.0.0'
-                    },
-                    timeout: 30000
-                  }
-                )
-
-                if (!retryResponse.data.accessToken) {
-                  throw new Error('重试刷新失败：响应中缺少 accessToken')
-                }
-
-                newAccessToken = retryResponse.data.accessToken
-                newRefreshToken = retryResponse.data.refreshToken
-                expiresIn = retryResponse.data.expiresIn || 3600
-                console.log(`  ✅ [Retry] ${account.email} - Token 刷新成功`)
-              } catch (ssoError: any) {
-                console.error(`  ❌ [Retry] ${account.email} - SSO Token 重试失败: ${ssoError.message}`)
-                throw new Error('所有刷新方式都失败，需要重新登录获取新凭证。')
-              }
-            } else {
-              throw new Error('AWS OIDC 刷新失败且缺少 SSO Token，需要重新登录。')
-            }
-          }
-        } else {
+        // 🆕 使用扁平化策略模式处理刷新失败
+        // 如果第一次刷新失败（401错误），尝试降级策略
+        if (firstError.response?.status !== 401) {
           // 非 401 错误，直接抛出
           throw firstError
+        }
+
+        console.log(`  🔄 [Retry] ${account.email} - RefreshToken 已失效，尝试降级策略...`)
+
+        // 创建错误链记录所有尝试
+        const errorChain = new RefreshErrorChain('All refresh strategies failed')
+        errorChain.addAttempt('Kiro API (社交登录)', firstError, firstError.response?.status)
+
+        // 定义降级刷新策略
+        const fallbackStrategies = [
+          {
+            name: 'AWS OIDC (IdC登录)',
+            condition: () => account.credentials.clientId && account.credentials.clientSecret && account.credentials.refreshToken,
+            execute: async () => {
+              const region = account.credentials.region || 'us-east-1'
+              const url = `https://oidc.${region}.amazonaws.com/token`
+
+              const response = await axios.post(
+                url,
+                {
+                  clientId: account.credentials.clientId,
+                  clientSecret: account.credentials.clientSecret,
+                  refreshToken: account.credentials.refreshToken,
+                  grantType: 'refresh_token'
+                },
+                {
+                  headers: { 'Content-Type': 'application/json' },
+                  timeout: 30000
+                }
+              )
+
+              if (!response.data.accessToken) {
+                throw new Error('AWS OIDC 刷新失败：响应中缺少 accessToken')
+              }
+
+              return {
+                accessToken: response.data.accessToken,
+                refreshToken: response.data.refreshToken,
+                expiresIn: response.data.expiresIn || 3600
+              }
+            }
+          },
+          {
+            name: 'SSO Token 重新认证',
+            condition: () => !!account.credentials.ssoToken,
+            execute: async () => {
+              // 第一步：使用 SSO Token 重新获取 RefreshToken
+              const reAuthResponse = await axios.post(
+                `${KIRO_AUTH_ENDPOINT}/refreshToken`,
+                { refreshToken: account.credentials.ssoToken },
+                {
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'kiro-account-manager/1.0.0'
+                  },
+                  timeout: 30000
+                }
+              )
+
+              if (!reAuthResponse.data.accessToken || !reAuthResponse.data.refreshToken) {
+                throw new Error('重新获取 Token 失败：响应中缺少必要字段')
+              }
+
+              // 更新 RefreshToken
+              const newRefreshTokenFromReAuth = reAuthResponse.data.refreshToken
+              const newAccessTokenFromReAuth = reAuthResponse.data.accessToken
+              await AccountDB.updateOAuthCredentials(account.id, {
+                access_token: newAccessTokenFromReAuth,
+                refresh_token: newRefreshTokenFromReAuth
+              })
+
+              // 第二步：使用新的 RefreshToken 再次尝试刷新
+              const retryResponse = await axios.post(
+                `${KIRO_AUTH_ENDPOINT}/refreshToken`,
+                { refreshToken: newRefreshTokenFromReAuth },
+                {
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'kiro-account-manager/1.0.0'
+                  },
+                  timeout: 30000
+                }
+              )
+
+              if (!retryResponse.data.accessToken) {
+                throw new Error('重试刷新失败：响应中缺少 accessToken')
+              }
+
+              return {
+                accessToken: retryResponse.data.accessToken,
+                refreshToken: retryResponse.data.refreshToken,
+                expiresIn: retryResponse.data.expiresIn || 3600
+              }
+            }
+          }
+        ]
+
+        // 执行降级策略
+        for (const strategy of fallbackStrategies) {
+          if (!strategy.condition()) {
+            console.log(`  ⏭️  [Retry] ${account.email} - 跳过 ${strategy.name}（条件不满足）`)
+            continue
+          }
+
+          try {
+            console.log(`  🔄 [Retry] ${account.email} - 尝试 ${strategy.name}...`)
+            const result = await strategy.execute()
+
+            newAccessToken = result.accessToken
+            newRefreshToken = result.refreshToken
+            expiresIn = result.expiresIn
+
+            console.log(`  ✅ [Retry] ${account.email} - ${strategy.name} 成功`)
+
+            // 更新 Token
+            if (newRefreshToken && newRefreshToken !== account.credentials.refreshToken) {
+              await AccountDB.updateOAuthCredentials(account.id, {
+                access_token: newAccessToken,
+                refresh_token: newRefreshToken
+              })
+              console.log(`  ✅ [Retry] ${account.email} - Token 已更新`)
+            }
+
+            // 策略成功，跳出循环
+            break
+
+          } catch (error: any) {
+            console.error(`  ❌ [Retry] ${account.email} - ${strategy.name} 失败: ${error.message}`)
+            errorChain.addAttempt(strategy.name, error, error.response?.status)
+          }
+        }
+
+        // 如果所有策略都失败，抛出错误链
+        if (!newAccessToken) {
+          console.error(`  ❌ [Retry] ${account.email} - 所有刷新策略都失败`)
+          console.error(`  📋 错误详情:\n${errorChain.getFullTrace()}`)
+          throw errorChain
         }
       }
     } else {
@@ -834,12 +1065,11 @@ async function refreshSingleAccount(account: Account): Promise<RefreshDetail> {
     // 第三步：更新数据库
     await AccountDB.updateAccessToken(account.id, newAccessToken)
 
-    // 更新 refresh_token（如果有新的）
-    if (newRefreshToken && newRefreshToken !== account.credentials.refreshToken) {
-      await AccountDB.updateOAuthCredentials(account.id, {
-        refresh_token: newRefreshToken
-      })
-    }
+    // 更新 access_token 和 refresh_token
+    await AccountDB.updateOAuthCredentials(account.id, {
+      access_token: newAccessToken,
+      refresh_token: newRefreshToken
+    })
 
     // 更新过期时间和状态
     // 关键逻辑：Token 刷新成功时，只有检测到封禁才记录错误状态

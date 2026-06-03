@@ -75,12 +75,18 @@
           </el-select>
         </el-form-item>
 
-        <!-- Token 显示 -->
+        <!-- Access Token 显示 -->
         <el-form-item v-if="selectedToken" label="Access Token">
+          <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+            <el-tag size="small" type="success">用于 API 调用</el-tag>
+            <span style="font-size: 12px; color: #909399;">
+              格式: AWS SSO Token (以 aoa 开头，200-300字符)
+            </span>
+          </div>
           <el-input
             :model-value="selectedToken"
             type="textarea"
-            :rows="6"
+            :rows="4"
             readonly
             style="font-family: monospace; font-size: 13px;"
           />
@@ -90,7 +96,7 @@
               :icon="CopyDocument"
               @click="copyToken"
             >
-              复制 Token
+              复制 Access Token
             </el-button>
             <el-button
               type="warning"
@@ -98,6 +104,32 @@
               @click="handleRefreshToken"
             >
               刷新 Token
+            </el-button>
+          </div>
+        </el-form-item>
+
+        <!-- SSO Token 显示 -->
+        <el-form-item v-if="selectedAccount && selectedAccount.sso_token" label="SSO Token">
+          <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+            <el-tag size="small" type="info">x_amz_sso_authn</el-tag>
+            <span style="font-size: 12px; color: #909399;">
+              格式: JWT (用于设备授权流程，不能直接调用 API)
+            </span>
+          </div>
+          <el-input
+            :model-value="selectedAccount.sso_token"
+            type="textarea"
+            :rows="4"
+            readonly
+            style="font-family: monospace; font-size: 13px;"
+          />
+          <div style="margin-t 8px;">
+            <el-button
+              type="primary"
+              :icon="CopyDocument"
+              @click="copySsoToken"
+            >
+              复制 SSO Token
             </el-button>
           </div>
         </el-form-item>
@@ -613,7 +645,7 @@ const copyToken = async () => {
 
   try {
     await navigator.clipboard.writeText(selectedToken.value)
-    ElMessage.success('Token 已复制到剪贴板')
+    ElMessage.success('Access Token 已复制到剪贴板')
   } catch (error) {
     // 备用方案
     const textarea = document.createElement('textarea')
@@ -624,7 +656,30 @@ const copyToken = async () => {
     textarea.select()
     document.execCommand('copy')
     document.body.removeChild(textarea)
-    ElMessage.success('Token 已复制到剪贴板')
+    ElMessage.success('Access Token 已复制到剪贴板')
+  }
+}
+
+const copySsoToken = async () => {
+  if (!selectedAccount.value?.sso_token) {
+    ElMessage.warning('该账号没有 SSO Token')
+    return
+  }
+
+  try {
+    await navigator.clipboard.writeText(selectedAccount.value.sso_token)
+    ElMessage.success('SSO Token (x_amz_sso_authn) 已复制到剪贴板')
+  } catch (error) {
+    // 备用方案
+    const textarea = document.createElement('textarea')
+    textarea.value = selectedAccount.value.sso_token
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+    ElMessage.success('SSO Token (x_amz_sso_authn) 已复制到剪贴板')
   }
 }
 

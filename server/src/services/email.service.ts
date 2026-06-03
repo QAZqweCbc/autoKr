@@ -7,8 +7,10 @@ import Imap from 'imap'
 import { simpleParser } from 'mailparser'
 
 interface EmailMessage {
+  uid: number
   subject: string
   from: string
+  to?: string
   date: Date
   text?: string
   html?: string
@@ -55,15 +57,23 @@ export async function fetchQQEmail(
           const fetch = imap.fetch(results, { bodies: '' })
           let processed = 0
 
-          fetch.on('message', (msg) => {
+          fetch.on('message', (msg, seqno) => {
+            let uid = 0
+
+            msg.once('attributes', (attrs) => {
+              uid = attrs.uid
+            })
+
             msg.on('body', (stream: any) => {
               simpleParser(stream as any, (err, parsed) => {
                 if (err) {
                   console.error('解析邮件失败:', err)
                 } else {
                   messages.push({
+                    uid: uid,
                     subject: parsed.subject || '',
                     from: parsed.from?.text || '',
+                    to: parsed.to?.text || '',
                     date: parsed.date || new Date(),
                     text: parsed.text,
                     html: parsed.html as string
@@ -118,7 +128,7 @@ export async function testEmailConnection(
 }> {
   try {
     const messages = await fetchQQEmail(email, authCode, ['UNSEEN'])
-    
+
     return {
       success: true,
       unreadCount: messages.length,
@@ -131,4 +141,74 @@ export async function testEmailConnection(
   } catch (error) {
     throw error
   }
+}
+
+/**
+ * 删除邮件
+ */
+export async function deleteEmail(
+  email: string,
+  authCode: string,
+  uid: number
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const imap = new Imap({
+      user: email,
+      password: authCode,
+      host: 'imap.qq.com',
+      port: 993,
+      tls: true,
+      tlsOptions: { rejectUnauthorized: false }
+    })
+
+    imap.once('ready', () => {
+      imap.openBox('INBOX', false, (err) => {
+        if (err) {
+          imap.end()
+          return reject(err)
+        }
+
+        // 标记邮件为删除
+        imap.addFlags(uid, '\\Deleted', (err) => {
+          if (err) {
+            imap.end()
+            return reject(err)
+          }
+
+          // 永久删除
+          imap.expunge((err) => {
+            imap.end()
+            if (err) {
+              return reject(err)
+            }
+            resolve()
+          })
+        })
+      })
+    })
+
+    imap.once('error', (err) => {
+      reject(err)
+    })
+
+    imap.connect()
+  })
+}
+
+/**
+ * 检测Amazon Web Services邮件
+ * 只检查未读邮件，避免重复处理历史邮件
+ */
+export async function checkAmazonEmails(
+  email: string,
+  authCode: string
+): Promise<EmailMessage[]> {
+  // 只获取未读邮件
+  const unreadMessages = await fetchQQEmail(email, authCode, ['UNSEEN'])
+
+  // 过滤Amazon Web Services邮件
+  return unreadMessages.filter(msg => {
+    const fromLower = msg.from.toLowerCase()
+    return fromLower.includes('amazon web services')
+  })
 }

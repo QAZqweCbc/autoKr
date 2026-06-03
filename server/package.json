@@ -21,6 +21,7 @@
     "quick:smtp": "ts-node --project tsconfig.json --transpile-only src/scripts/quick-setup-smtp.ts",
     "init:admin": "ts-node --project tsconfig.json --transpile-only src/scripts/init-admin.ts",
     "optimize:db": "ts-node --project tsconfig.json --transpile-only src/scripts/optimize-database.ts",
+    "fix:sso-mapping": "ts-node --project tsconfig.json --transpile-only src/scripts/fix-sso-token-mapping.ts",
     "migrate:db-config": "ts-node --project tsconfig.json --transpile-only scripts/migrate-database-config.ts",
     "frontend:install": "cd frontend && npm install",
     "frontend:build": "cd frontend && npm run build",

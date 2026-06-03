@@ -5,6 +5,7 @@
 
 import { encode, decode } from 'cbor-x'
 import { randomBytes } from 'crypto'
+import { validateAccessToken, logTokenValidation } from '../utils/token-validator'
 
 // ✅ 使用正确的 Kiro Web Portal Service 端点
 const KIRO_API_BASE = 'https://app.kiro.dev/service/KiroWebPortalService/operation'
@@ -29,6 +30,14 @@ export async function kiroApiRequest<T>(
   console.log(`[Kiro API] Body:`, JSON.stringify(body))
   console.log(`[Kiro API] IDP: ${idp}`)
   console.log(`[Kiro API] AccessToken length:`, accessToken?.length)
+
+  // ✅ 验证 Token 格式
+  const validation = validateAccessToken(accessToken)
+  logTokenValidation(`Kiro API - ${operation}`, accessToken, validation)
+
+  if (!validation.valid) {
+    console.error(`[Kiro API] ⚠️  Token 格式可能有问题，但仍尝试调用 API`)
+  }
 
   // 编码 CBOR 请求体
   const encodedBody = encode(body)

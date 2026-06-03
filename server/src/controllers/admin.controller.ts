@@ -15,7 +15,8 @@ import {
   updateClientUser,
   updateLastLogin
 } from '../services/client-user.service'
-import { MySQLAccountDB, getPool } from '../services/mysql.service'
+import { getPool } from '../services/mysql.service'
+import { MySQLAccountDBNew as MySQLAccountDB } from '../services/mysql-account.service'
 import { isAccountAvailable } from '../services/token-availability.service'
 import { flatToAccount } from '../utils/account-mapper'
 

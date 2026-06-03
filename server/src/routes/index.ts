@@ -15,6 +15,7 @@ import adminRoutes from './admin.routes'
 import refreshLogRoutes from './refresh-log.routes'
 import healthCheckRoutes from './health-check.routes'
 import registrationLogRoutes from './registration-log.routes'
+import deletionLogRoutes from './account-deletion-log.routes'
 import { getStorageMode } from '../services/database.adapter'
 
 const router = Router()
@@ -32,6 +33,7 @@ router.use('/admin', adminRoutes)  // 新增管理员路由
 router.use('/refresh', refreshLogRoutes)  // 刷新日志路由
 router.use('/health', healthCheckRoutes)  // 健康检查路由
 router.use('/registration', registrationLogRoutes)  // 注册日志路由
+router.use('/deletion-logs', deletionLogRoutes)  // 账号删除日志路由
 
 // 基础健康检查（保留向后兼容）
 router.get('/health-basic', (req, res) => {

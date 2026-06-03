@@ -36,6 +36,43 @@ const httpServer = createServer(app)
 
 const PORT = process.env.PORT || 1455
 
+async function cleanupStartupResources() {
+  try {
+    const { stopAutoRefreshScheduler } = await import('./services/auto-refresh-optimized.service')
+    stopAutoRefreshScheduler()
+  } catch (error: any) {
+    logger.warn('停止自动刷新调度器失败:', error?.message || error)
+  }
+
+  try {
+    await closeDatabase()
+  } catch (error: any) {
+    logger.warn('关闭数据库连接失败:', error?.message || error)
+  }
+}
+
+function logStartupError(error: any) {
+  logger.error('='.repeat(60))
+  logger.error('❌ 服务器启动失败')
+  logger.error('='.repeat(60))
+
+  if (error?.code === 'EADDRINUSE') {
+    logger.error(`端口 ${PORT} 已被占用，服务无法启动`)
+    logger.error('处理方式:')
+    logger.error(`1. Linux/macOS: lsof -i :${PORT} 或 ss -ltnp | grep :${PORT}`)
+    logger.error(`2. Windows: netstat -ano | findstr :${PORT}`)
+    logger.error('3. 停止占用该端口的旧进程，或在 .env 中修改 PORT')
+  } else {
+    logger.error(`错误: ${error?.message || error}`, { stack: error?.stack })
+    logger.error('常见问题排查:')
+    logger.error('1. 依赖未安装: npm install')
+    logger.error('2. 数据库初始化失败: 检查数据库配置')
+    logger.error('3. Playwright 未安装: npx playwright install chromium')
+  }
+
+  logger.error('='.repeat(60))
+}
+
 // ============================================
 // CORS 配置
 // ============================================
@@ -173,19 +210,32 @@ async function start() {
       logger.warn('⚠️  已降级到 JSON 存储模式继续启动')
     }
     logger.info(`📦 当前存储模式: ${getStorageMode().toUpperCase()}`)
-    
+
+    // 初始化账号删除日志表
+    logger.info('📦 初始化账号删除日志表...')
+    const { createDeletionLogTable } = await import('./services/account-deletion-log.service')
+    await createDeletionLogTable()
+
     // 初始化 WebSocket
     logger.info('🔌 初始化 WebSocket...')
     initWebSocket(io)
     logger.info('✅ WebSocket 初始化完成')
-    
+
     // 启动自动刷新调度器（优化版）
     logger.info('🔄 启动 Token 自动刷新调度器（优化版）...')
     const { startAutoRefreshScheduler } = await import('./services/auto-refresh-optimized.service')
     startAutoRefreshScheduler()
+
+    // 启动邮箱检测调度器
+    logger.info('📧 启动邮箱检测调度器...')
+    const { startEmailDetectionScheduler } = await import('./services/email-detection.service')
+    startEmailDetectionScheduler()
     
     // 启动 HTTP 服务器
-    httpServer.listen(PORT, () => {
+    await new Promise<void>((resolve, reject) => {
+      httpServer.once('error', reject)
+      httpServer.listen(PORT, () => {
+        httpServer.off('error', reject)
       logger.info('='.repeat(60))
       logger.info('✅ 服务器启动成功！')
       logger.info('='.repeat(60))
@@ -215,18 +265,12 @@ async function start() {
       logger.info('   - 按 Ctrl+C 停止服务器')
       logger.info('   - 查看 server/README.md 了解更多信息')
       logger.info('')
+        resolve()
+      })
     })
   } catch (error: any) {
-    logger.error('='.repeat(60))
-    logger.error('❌ 服务器启动失败')
-    logger.error('='.repeat(60))
-    logger.error(`错误: ${error.message}`, { stack: error.stack })
-    logger.error('常见问题排查：')
-    logger.error(`1. 端口被占用: lsof -i :${PORT}`)
-    logger.error('2. 依赖未安装: npm install')
-    logger.error('3. 数据库初始化失败: 检查数据库配置')
-    logger.error('4. Playwright 未安装: npx playwright install chromium')
-    logger.error('='.repeat(60))
+    await cleanupStartupResources()
+    logStartupError(error)
     process.exit(1)
   }
 }
@@ -234,11 +278,15 @@ async function start() {
 // 优雅关闭
 process.on('SIGINT', async () => {
   logger.info('正在关闭服务器...')
-  
+
   // 停止自动刷新调度器
   const { stopAutoRefreshScheduler } = await import('./services/auto-refresh-optimized.service')
   stopAutoRefreshScheduler()
-  
+
+  // 停止邮箱检测调度器
+  const { stopEmailDetectionScheduler } = await import('./services/email-detection.service')
+  stopEmailDetectionScheduler()
+
   await closeDatabase()
   httpServer.close(() => {
     logger.info('✅ 服务器已关闭')
@@ -248,9 +296,14 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
   logger.info('正在关闭服务器...')
-  
+
   // 停止自动刷新调度器
   const { stopAutoRefreshScheduler } = await import('./services/auto-refresh-optimized.service')
+  stopAutoRefreshScheduler()
+
+  // 停止邮箱检测调度器
+  const { stopEmailDetectionScheduler } = await import('./services/email-detection.service')
+  stopEmailDetectionScheduler()
   stopAutoRefreshScheduler()
   
   await closeDatabase()

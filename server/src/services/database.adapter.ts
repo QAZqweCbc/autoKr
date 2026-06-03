@@ -5,7 +5,8 @@
 import { Task, TaskStats } from '../models/task.model'
 import { Account, AccountStats } from '../models/account.model'
 import { TaskDB as JSONTaskDB, AccountDB as JSONAccountDB, initDatabase as initJSON } from './database.service'
-import { MySQLTaskDB, MySQLAccountDB, initMySQL, closeMySQL } from './mysql.service'
+import { MySQLTaskDB, initMySQL, closeMySQL } from './mysql.service'
+import { MySQLAccountDBNew as MySQLAccountDB } from './mysql-account.service'
 import { RedisTaskDB, RedisAccountDB } from './redis-storage.service'
 import { initRedis, closeRedis } from './redis.service'
 import { loadDatabaseConfig, DatabaseConfig } from './database-config.service'
@@ -339,6 +340,7 @@ export const AccountDB = {
   },
 
   async updateOAuthCredentials(id: string, credentials: {
+    access_token?: string
     refresh_token?: string
     client_id?: string
     client_secret?: string
@@ -349,6 +351,10 @@ export const AccountDB = {
       await this.update(id, {
         credentials: {
           ...account.credentials,
+          // 显式保留 ssoToken，防止丢失
+          ssoToken: account.credentials.ssoToken,
+          // 更新或保留其他字段
+          accessToken: credentials.access_token ?? account.credentials.accessToken,
           refreshToken: credentials.refresh_token ?? account.credentials.refreshToken,
           clientId: credentials.client_id ?? account.credentials.clientId,
           clientSecret: credentials.client_secret ?? account.credentials.clientSecret,

@@ -3,7 +3,7 @@
  * 管理账号池状态，确保可分配账号数 = 普通用户数
  */
 
-import { MySQLAccountDB } from './mysql.service'
+import { MySQLAccountDBNew as MySQLAccountDB } from './mysql-account.service'
 import { getAllClientUsers } from './client-user.service'
 import { isAccountAvailable } from './token-availability.service'
 import { startRegisterTask } from './register.service'

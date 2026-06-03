@@ -80,6 +80,12 @@ const router = createRouter({
       meta: { title: '实时日志', icon: '📊' }
     },
     {
+      path: '/deletion-logs',
+      name: 'deletion-logs',
+      component: () => import('../views/DeletionLogsView.vue'),
+      meta: { title: '删除日志', icon: '🗑️' }
+    },
+    {
       path: '/user-management',
       name: 'user-management',
       component: () => import('../views/UserManagementView.vue'),
