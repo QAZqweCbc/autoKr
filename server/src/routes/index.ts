@@ -16,6 +16,7 @@ import refreshLogRoutes from './refresh-log.routes'
 import healthCheckRoutes from './health-check.routes'
 import registrationLogRoutes from './registration-log.routes'
 import deletionLogRoutes from './account-deletion-log.routes'
+import setupRoutes from './setup.routes'
 import { getStorageMode } from '../services/database.adapter'
 
 const router = Router()
@@ -27,6 +28,7 @@ router.use('/generator', generatorRoutes)
 router.use('/config', configRoutes)
 router.use('/config/browser', browserConfigRoutes)
 router.use('/database', databaseConfigRoutes)  // 新增数据库配置路由
+router.use('/setup', setupRoutes)  // 配置向导路由
 router.use('/token', tokenRoutes)
 router.use('/check', checkRoutes)
 router.use('/admin', adminRoutes)  // 新增管理员路由

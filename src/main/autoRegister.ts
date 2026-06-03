@@ -13,9 +13,63 @@
 import { chromium, Browser, Page } from 'playwright'
 import Imap from 'imap'
 import { simpleParser } from 'mailparser'
+import * afrom 'fs'
+import * as path from 'path'
 
 // 日志回调类型
 type LogCallback = (message: string) => void
+
+// 调试HTML文件存放目录
+const DEBUG_HTML_DIR = path.resolve(__dirname, '../../logs/debug-html')
+
+// 初始化调试目录
+function ensureDebugDir() {
+  if (!fs.existsSync(DEBUG_HTML_DIR)) {
+    fs.mkdirSync(DEBUG_HTML_DIR, {旧的调试HTML文件（保留最近7天）
+function cleanupOldDebugFiles() {
+  try {
+    ensureDebugDir()
+    const files = fs.readdirSync(DEBUG_HTML_DIR)
+    const now = Date.now()
+    const maxAge = 7 * 24 * 60 * 60 * 1000 // 7天（毫秒）
+
+    let deletedCount = 0
+    for (const file of files) {
+      if (!file.endsWith('.html')) continue
+
+      const filePath = path.join(DEBUG_HTML_DIR, file)
+      const stats = fs.statSync(filePath)
+      const age = now - stats.mtimeMs
+
+      if (age > maxAge) {
+        fs.unlinkSync(filePath)
+        deletedCount++
+      }
+    }
+
+    if (deletedCount > 0) {
+      console.log(`🧹 已清理 ${deletedCount} 个旧的调试HTML文件`)
+    }
+  } catch (error) {
+    console.warn('清理调试文件失败:', error)
+  }
+}
+
+// 保存调试HTML文件
+function saveDebugHtml(filename: string, content: string, log: LogCallback): string {
+  try {
+    ensureDebugDir()
+    cleanupOldDebugFiles()
+
+    const filePath = path.join(DEBUG_HTML_DIR, filename)
+    fs.writeFileSync(filePath, content)
+    log(`📄 已保存 HTML: ${filePath}`)
+    return filePath
+  } catch (error) {
+    log(`⚠️ 保存 HTML 失败: ${error}`)
+    return ''
+  }
+}
 
 // 验证码正则表达式 - 支持新旧两种格式
 const CODE_PATTERNS = [
@@ -1666,11 +1720,9 @@ export async function autoRegisterAWS(
       
       // 保存 HTML 用于调试
       try {
-        const fs = require('fs')
-        const htmlPath = `debug-login-redirect-${Date.now()}.html`
         const pageContent = await page.content()
-        fs.writeFileSync(htmlPath, pageContent)
-        log(`📄 已保存 HTML: ${htmlPath}`)
+        const filename = `debug-login-redirect-${Date.now()}.html`
+        saveDebugHtml(filename, pageContent, log)
       } catch (e) {
         log(`⚠️ 保存 HTML 失败: ${e}`)
       }
@@ -2004,10 +2056,9 @@ export async function autoRegisterAWS(
         log(`已保存调试截图: ${screenshotPath}`)
         
         // 保存页面 HTML 用于调试
-        const htmlPath = `debug-verification-${Date.now()}.html`
         const html = await page.content()
-        require('fs').writeFileSync(htmlPath, html)
-        log(`已保存页面 HTML: ${htmlPath}`)
+        const filename = `debug-verification-${Date.now()}.html`
+        saveDebugHtml(filename, html, log)
         
         // 打印当前页面的所有 input 元素
         const allInputs = await page.locator('input').evaluateAll((inputs) => 

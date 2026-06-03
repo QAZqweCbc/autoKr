@@ -1,46 +1,80 @@
 <template>
   <div class="app-container">
-    <Sidebar />
-    <main class="main-content">
-      <router-view v-slot="{ Component }">
-        <transition name="fade" mode="out-in">
-          <component :is="Component" />
-        </transition>
-      </router-view>
-    </main>
+    <!-- 配置向导（全屏遮罩） -->
+    <SetupWizardView
+      v-if="!setupCompleted"
+      @complete="handleSetupComplete"
+    />
+
+    <!-- 主应用 -->
+    <template v-else>
+      <Sidebar />
+      <main class="main-content">
+        <router-view v-slot="{ Component }">
+          <transition name="fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
+      </main>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import Sidebar from './components/Sidebar.vue'
+import SetupWizardView from './views/SetupWizardView.vue'
 import { useWebSocketStore } from './stores/websocket'
+import { checkSetupStatus } from './api/setup'
 
 const wsStore = useWebSocketStore()
+const setupCompleted = ref(false)
 
 // 监听侧边栏状态变化，触发全局 resize 事件
 let sidebarObserver: MutationObserver | null = null
 
-onMounted(() => {
-  wsStore.connect()
-  
-  // 监听 body 的 class 变化（sidebar-collapsed）
-  sidebarObserver = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      if (mutation.attributeName === 'class') {
-        // 延迟触发 resize 事件，确保 CSS 过渡完成
-        setTimeout(() => {
-          window.dispatchEvent(new Event('resize'))
-        }, 350) // 与 CSS transition 时间一致
-      }
-    })
-  })
+onMounted(async () => {
+  // 检查配置状态
+  try {
+    const result = await checkSetupStatus()
+    if (result.success && result.status) {
+      setupCompleted.value = result.status.completed
+    } else {
+      setupCompleted.value = false
+    }
+  } catch (error) {
+    console.error('检查配置状态失败:', error)
+    setupCompleted.value = false
+  }
 
-  sidebarObserver.observe(document.body, {
-    attributes: true,
-    attributeFilter: ['class']
-  })
+  // 只有在配置完成后才连接 WebSocket
+  if (setupCompleted.value) {
+    wsStore.connect()
+
+    // 监听 body 的 class 变化（sidebar-collapsed）
+    sidebarObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'class') {
+          // 延迟触发 resize 事件，确保 CSS 过渡完成
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 350) // 与 CSS transition 时间一致
+        }
+      })
+    })
+
+    sidebarObserver.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class']
+    })
+  }
 })
+
+const handleSetupComplete = () => {
+  setupCompleted.value = true
+  // 配置完成后连接 WebSocket
+  wsStore.connect()
+}
 
 onUnmounted(() => {
   wsStore.disconnect()
