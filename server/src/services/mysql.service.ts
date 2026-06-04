@@ -17,26 +17,31 @@ export interface MySQLConfig {
 
 /**
  * 初始化 MySQL 连接池
+ * @param config MySQL配置
+ * @param skipConnectionTest 是否跳过连接测试（预检已通过时为true）
  */
-export async function initMySQL(config: MySQLConfig) {
+export async function initMySQL(config: MySQLConfig, skipConnectionTest: boolean = false) {
   try {
     console.log('\n📦 初始化 MySQL 连接...')
     console.log(`   主机: ${config.host}:${config.port}`)
     console.log(`   数据库: ${config.database}`)
-    
-    // 先连接到 MySQL（不指定数据库）
-    const tempConnection = await mysql.createConnection({
-      host: config.host,
-      port: config.port,
-      user: config.user,
-      password: config.password
-    })
-    
-    // 创建数据库（如果不存在）
-    await tempConnection.query(`CREATE DATABASE IF NOT EXISTS \`${config.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
-    console.log(`✅ 数据库 ${config.database} 已就绪`)
-    await tempConnection.end()
-    
+
+    if (!skipConnectionTest) {
+      // 仅在预检未通过时才测试连接
+      const tempConnection = await mysql.createConnection({
+        host: config.host,
+        port: config.port,
+        user: config.user,
+        password: config.password
+      })
+
+      await tempConnection.ping()
+      await tempConnection.end()
+      console.log('✅ MySQL 连接测试通过')
+    } else {
+      console.log('ℹ️  预检已通过，跳过重复连接测试')
+    }
+
     // 创建连接池（指定数据库）
     pool = mysql.createPool({
       host: config.host,
@@ -48,13 +53,14 @@ export async function initMySQL(config: MySQLConfig) {
       connectionLimit: 10,
       queueLimit: 0
     })
-    
-    // 测试连接
+
+    // 确保数据库存在
     const connection = await pool.getConnection()
-    await connection.ping()
+    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${config.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+    await connection.query(`USE \`${config.database}\``)
     connection.release()
-    
-    console.log('✅ MySQL 连接成功')
+
+    console.log('✅ MySQL 初始化完成')
     
     // 创建表
     await createTables()
@@ -389,6 +395,13 @@ export async function closeMySQL() {
 export function getPool() {
   if (!pool) throw new Error('MySQL 未初始化')
   return pool
+}
+
+/**
+ * 设置连接池（用于多进程共享初始化）
+ */
+export function setPool(newPool: mysql.Pool) {
+  pool = newPool
 }
 
 // ==================== 任务操作 ====================

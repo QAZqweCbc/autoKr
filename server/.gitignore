@@ -21,6 +21,9 @@ data/
 *.db
 *.sqlite
 
+# æ•°æ®åº“åˆå§‹åŒ–çŠ¶æ€ï¼ˆå¤šè¿›ç¨‹åè°ƒï¼‰
+.db-init-state.json
+
 # IDE
 .vscode/
 .idea/
@@ -43,6 +46,10 @@ Thumbs.db
 logs/
 *.log
 
-# æµ‹è¯•è¦†ç›–ç‡
+# æµ‹è¯•è¦†ç›–ç?
 coverage/
 .nyc_output/
+
+# Êı¾İ¿âÅäÖÃÎÄ¼ş£¨º¬Ã÷ÎÄÆ¾¾İ£©
+config/database.config.json
+

@@ -11,6 +11,7 @@ import { createServer } from 'http'
 import path from 'path'
 import { createProxyMiddleware } from 'http-proxy-middleware'
 import { initDatabase, closeDatabase, forceJsonFallback, getStorageMode } from './services/database.adapter'
+import { markPreCheckDone, cleanupInitState } from './services/database-init-coordinator.service'
 import { initWebSocket } from './websocket/socket.handler'
 import apiRoutes from './routes'
 import { logger, requestLogger } from './utils/logger'
@@ -205,12 +206,15 @@ async function start() {
     const { performPreStartupCheck } = await import('./services/pre-startup-check.service')
     const preCheckResult = await performPreStartupCheck()
 
+    // 标记预检完成（用于协调器共享状态）
+    markPreCheckDone(preCheckResult.storageMode)
+
     // 如果预检结果建议降级到 JSON，强制使用 JSON 模式
     if (preCheckResult.storageMode === 'json' && preCheckResult.warnings.length > 0) {
       forceJsonFallback('预启动检查建议使用 JSON 模式')
     }
 
-    // 初始化数据库
+    // 初始化数据库（支持多进程共享）
     logger.info('📦 初始化数据库...')
     try {
       await initDatabase()
@@ -296,6 +300,9 @@ process.on('SIGINT', async () => {
   const { stopEmailDetectionScheduler } = await import('./services/email-detection.service')
   stopEmailDetectionScheduler()
 
+  // 清理数据库初始化状态
+  cleanupInitState()
+
   await closeDatabase()
   httpServer.close(() => {
     logger.info('✅ 服务器已关闭')
@@ -313,8 +320,10 @@ process.on('SIGTERM', async () => {
   // 停止邮箱检测调度器
   const { stopEmailDetectionScheduler } = await import('./services/email-detection.service')
   stopEmailDetectionScheduler()
-  stopAutoRefreshScheduler()
-  
+
+  // 清理数据库初始化状态
+  cleanupInitState()
+
   await closeDatabase()
   httpServer.close(() => {
     logger.info('✅ 服务器已关闭')

@@ -5,7 +5,8 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
-import { initDatabase, forceJsonFallback, getStorageMode } from '../services/database.adapter'
+import { initDatabase, forceJsonFallback, getStorageMode, closeDatabase } from '../services/database.adapter'
+import { markPreCheckDone } from '../services/database-init-coordinator.service'
 import authRoutes from './routes/auth.routes'
 import tokenRoutes from './routes/token.routes'
 import { validateEncryptionSetup } from '../utils/crypto.util'
@@ -116,12 +117,15 @@ async function start() {
     const { performPreStartupCheck } = await import('../services/pre-startup-check.service')
     const preCheckResult = await performPreStartupCheck()
 
+    // 标记预检完成（用于协调器共享状态）
+    markPreCheckDone(preCheckResult.storageMode)
+
     // 如果预检结果建议降级到 JSON，强制使用 JSON 模式
     if (preCheckResult.storageMode === 'json' && preCheckResult.warnings.length > 0) {
       forceJsonFallback('预启动检查建议使用 JSON 模式')
     }
 
-    // 初始化数据库
+    // 初始化数据库（支持多进程共享）
     console.log('\n📦 初始化数据库...')
     try {
       await initDatabase()
@@ -167,7 +171,6 @@ async function start() {
 // 优雅关闭
 process.on('SIGINT', async () => {
   console.log('\n\n正在关闭注册认证服务...')
-  const { closeDatabase } = await import('../services/database.adapter')
   await closeDatabase()
   console.log('✅ 服务已关闭')
   process.exit(0)
@@ -175,7 +178,6 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
   console.log('\n\n正在关闭注册认证服务...')
-  const { closeDatabase } = await import('../services/database.adapter')
   await closeDatabase()
   console.log('✅ 服务已关闭')
   process.exit(0)

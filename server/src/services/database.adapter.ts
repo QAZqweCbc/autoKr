@@ -14,10 +14,20 @@ import { loadDatabaseConfig, DatabaseConfig } from './database-config.service'
 // 重新导出类型
 export type { Task, Account }
 
+import {
+  tryBecomeInitializer,
+  waitForDatabaseInit,
+  markPreCheckDone,
+  markInitDone,
+  getInitState
+} from './database-init-coordinator.service'
+
 let currentStorage: 'json' | 'mysql' | 'redis' = 'json'
 let config: DatabaseConfig
 let isInitialized = false
 let initializationPromise: Promise<void> | null = null
+let preCheckPassed = false  // 标记预检是否已通过
+let isInitializer = false  // 当前进程是否为初始化进程
 
 export function forceJsonFallback(reason: string) {
   console.warn('\n' + '='.repeat(60))
@@ -36,28 +46,69 @@ export function forceJsonFallback(reason: string) {
 }
 
 /**
- * 初始化数据库（根据配置自动选择）
+ * 标记预检已通过（由预启动检查服务调用）
+ */
+export function markPreCheckPassed() {
+  preCheckPassed = true
+}
+
+/**
+ * 初始化数据库（根据配置自动选择，支持多进程共享初始化）
  */
 export async function initDatabase() {
   // 如果已经在初始化中，返回同一个Promise
   if (initializationPromise) {
     return initializationPromise
   }
-  
+
   initializationPromise = (async () => {
     try {
+      // 检查是否已有其他进程完成初始化
+      const existingState = getInitState()
+      if (existingState?.initialized) {
+        console.log('ℹ️  检测到数据库已由其他服务初始化完成')
+        console.log(`   存储模式: ${existingState.storageMode.toUpperCase()}`)
+        currentStorage = existingState.storageMode
+
+        // 为当前进程创建自己的连接池
+        await createConnectionPool(existingState.storageMode)
+
+        isInitialized = true
+        console.log('✅ 数据库连接池创建完成（复用已有初始化）')
+        return
+      }
+
+      // 尝试成为初始化进程
+      isInitializer = tryBecomeInitializer()
+
+      if (!isInitializer) {
+        // 不是初始化进程，等待主进程完成初始化
+        console.log('ℹ️  等待主服务完成数据库初始化...')
+        const state = await waitForDatabaseInit()
+        currentStorage = state.storageMode
+
+        // 为当前进程创建自己的连接池
+        await createConnectionPool(state.storageMode)
+
+        isInitialized = true
+        console.log('✅ 数据库连接池创建完成')
+        return
+      }
+
+      // 作为主初始化进程，执行完整初始化
+      console.log('🎯 当前进程负责数据库初始化')
       config = loadDatabaseConfig()
       currentStorage = config.storage
-      
+
       console.log(`\n📦 存储模式: ${currentStorage.toUpperCase()}`)
-      
+
       if (currentStorage === 'mysql') {
         // 初始化 MySQL
         if (!config.mysql) {
           throw new Error('MySQL 配置缺失')
         }
-        await initMySQL(config.mysql)
-        
+        await initMySQL(config.mysql, preCheckPassed)
+
         // 初始化 Redis（可选，用于缓存）
         if (config.redis && config.redis.host && config.redis.host.trim() !== '') {
           try {
@@ -78,9 +129,11 @@ export async function initDatabase() {
         // 初始化 JSON 文件存储
         initJSON()
       }
-      
+
       isInitialized = true
-      console.log('✅ 数据库初始化完成')
+      markInitDone(currentStorage)
+
+      console.log('✅ 数据库初始化完成（主进程）')
     } catch (error: any) {
       console.error('❌ 数据库初始化失败:', error.message)
       isInitialized = false
@@ -88,8 +141,63 @@ export async function initDatabase() {
       throw error
     }
   })()
-  
+
   return initializationPromise
+}
+
+/**
+ * 为当前进程创建数据库连接池（不执行表创建等初始化操作）
+ */
+async function createConnectionPool(storageMode: 'json' | 'mysql' | 'redis') {
+  config = loadDatabaseConfig()
+
+  if (storageMode === 'mysql') {
+    if (!config.mysql) {
+      throw new Error('MySQL 配置缺失')
+    }
+
+    // 只创建连接池，不执行初始化
+    const mysql = await import('mysql2/promise')
+    const { getPool, setPool } = await import('./mysql.service')
+
+    const pool = mysql.createPool({
+      host: config.mysql.host,
+      port: config.mysql.port,
+      user: config.mysql.user,
+      password: config.mysql.password,
+      database: config.mysql.database,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0
+    })
+
+    // 测试连接
+    const connection = await pool.getConnection()
+    await connection.ping()
+    connection.release()
+
+    // 设置全局连接池
+    setPool(pool)
+
+    console.log('✅ MySQL 连接池已创建')
+
+    // 初始化 Redis（可选，用于缓存）
+    if (config.redis && config.redis.host && config.redis.host.trim() !== '') {
+      try {
+        await initRedis(config.redis)
+      } catch (error) {
+        console.warn('⚠️  Redis 连接失败，将不使用缓存')
+      }
+    }
+  } else if (storageMode === 'redis') {
+    if (!config.redis || !config.redis.host || config.redis.host.trim() === '') {
+      throw new Error('Redis 配置缺失或主机地址为空')
+    }
+    await initRedis(config.redis)
+  } else {
+    // JSON 模式无需特殊处理
+    initJSON()
+  }
 }
 
 /**

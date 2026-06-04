@@ -4,7 +4,7 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "lib": ["ES2021"],
-    "rootDir": ".",
+    "rootDir": "./src",
     "outDir": "dist",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
