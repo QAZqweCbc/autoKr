@@ -74,6 +74,24 @@ export interface ServerConfig {
       consecutiveFailuresError?: number  // 连续失败告警阈值（默认3）
       refreshTimeoutWarning?: number  // 刷新超时告警阈值（分钟，默认120）
     }
+    // ?????????
+    distributedLock?: {
+      enabled?: boolean
+      ttl?: number
+      retryDelay?: number
+      retryTimes?: number
+    }
+
+    // ?????????
+    exponentialBackoff?: {
+      enabled?: boolean
+    }
+
+    // ??????????
+    priorityQueue?: {
+      enabled?: boolean
+    }
+
   }
   databaseConfigMigrated?: boolean  // 标记数据库配置已迁移
 }

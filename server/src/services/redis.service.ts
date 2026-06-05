@@ -3,6 +3,7 @@
  */
 
 import Redis from 'ioredis'
+import { dedupLogger } from '../utils/logger-dedup'
 
 let redis: Redis | null = null
 
@@ -20,24 +21,32 @@ export async function initRedis(config: RedisConfig) {
   try {
     console.log('\n📦 初始化 Redis 连接...')
     console.log(`   主机: ${config.host}:${config.port}`)
-    
+
+    let lastErrorTime = 0
+    const errorSuppressMs = 3000 // 3秒内不重复输出相同错误
+
     redis = new Redis({
       host: config.host,
       port: config.port,
       password: config.password,
       db: config.db || 0,
       // 连接保活配置
-      keepAlive: 30000, // 30秒发送一次保活包
-      connectTimeout: 10000, // 连接超时10秒
-      // 重连策略
+      keepAlive: 30000,
+      connectTimeout: 10000,
+      // 重连策略 - 仅在第一次失败和最后一次失败时记录
       retryStrategy: (times) => {
-        if (times > 10) {
-          console.error('❌ Redis 重连失败次数过多，停止重试')
+        const maxRetries = 10
+        if (times > maxRetries) {
+          dedupLogger.log('❌ Redis 重连失败次数过多，停止重试', 'error')
+          dedupLogger.flushNow()
           return null
         }
-        const delay = Math.min(times * 200, 2000)
-        console.log(`🔄 Redis 重连中... (第${times}次，${delay}ms后重试)`)
-        return delay
+        // 只记录第1次和最后一次重试
+        if (times === 1 || times === maxRetries) {
+          const delay = Math.min(times * 200, 2000)
+          dedupLogger.log(`🔄 Redis 重连中... (第${times}次，${delay}ms后重试)`, 'warn')
+        }
+        return Math.min(times * 200, 2000)
       },
       // 自动重连
       enableReadyCheck: true,
@@ -47,33 +56,24 @@ export async function initRedis(config: RedisConfig) {
       lazyConnect: false,
       maxRetriesPerRequest: 3
     })
-    
+
+    // 立即添加错误处理，防止 "Unhandled error event"
+    // 使用时间戳来限制错误消息的输出频率，避免日志刷屏
+    redis.on('error', (err) => {
+      const now = Date.now()
+      if (now - lastErrorTime > errorSuppressMs) {
+        const errMsg = err?.message || String(err)
+        console.warn(`⚠️  Redis 连接失败: ${errMsg}`)
+        lastErrorTime = now
+      }
+    })
+
     // 测试连接
     await redis.ping()
-    
+
     console.log('✅ Redis 连接成功')
-    
-    // 监听连接事件
-    redis.on('error', (err) => {
-      console.error('❌ Redis 错误:', err.message)
-    })
-    
-    redis.on('close', () => {
-      console.warn('⚠️  Redis 连接已关闭')
-    })
-    
-    redis.on('reconnecting', () => {
-      console.log('🔄 Redis 正在重连...')
-    })
-    
-    redis.on('connect', () => {
-      console.log('✅ Redis 已连接')
-    })
-    
-    redis.on('ready', () => {
-      console.log('✅ Redis 已就绪')
-    })
-    
+    lastErrorTime = 0 // 连接成功后重置
+
     return true
   } catch (error: any) {
     console.error('\n' + '='.repeat(60))
@@ -95,7 +95,22 @@ export async function initRedis(config: RedisConfig) {
  */
 export async function closeRedis() {
   if (redis) {
-    await redis.quit()
+    try {
+      // 检查连接状态，只在连接有效时才调用 quit()
+      if (redis.status === 'connecting' || redis.status === 'connect' || redis.status === 'ready') {
+        await redis.quit()
+      } else {
+        // 连接已关闭或断开，直接断开连接
+        redis.disconnect()
+      }
+    } catch (error: any) {
+      console.warn(`⚠️  Redis 关闭时出错: ${error.message}，正在强制断开连接`)
+      try {
+        redis.disconnect()
+      } catch (e) {
+        // 忽略二次错误
+      }
+    }
     redis = null
     console.log('✅ Redis 连接已关闭')
   }

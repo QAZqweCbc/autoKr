@@ -1,11 +1,11 @@
-/**
+﻿/**
  * 邮箱检测服务
  * 检测Amazon Web Services邮件并自动删除对应账号
  */
 
 import { checkAmazonEmails, deleteEmail } from './email.service'
 import { getEmailConfig } from './email-config-manager.service'
-import { MySQLAccountDBNew as MySQLAccountDB } from './mysql-account.service'
+import { MySQLAccountDB } from './mysql-account.service'
 import { logAccountDeletion } from './account-deletion-log.service'
 import { withTransaction } from '../utils/transaction.util'
 import { getPool } from './mysql.service'
@@ -37,7 +37,7 @@ export interface DetectionResult {
 /**
  * 检查是否有Amazon邮件信号
  */
-async function checkForAmazonSignal(): Promise<boolean> {
+async function checkForAmazonSignal(includeRead: boolean = false): Promise<boolean> {
   try {
     const emailConfig = await getEmailConfig(true)
 
@@ -47,7 +47,7 @@ async function checkForAmazonSignal(): Promise<boolean> {
     }
 
     logger.debug('🔍 检查Amazon邮件信号...')
-    const amazonEmails = await checkAmazonEmails(emailConfig.qqEmail, emailConfig.authCode)
+    const amazonEmails = await checkAmazonEmails(emailConfig.qqEmail, emailConfig.authCode, includeRead)
 
     if (amazonEmails.length > 0) {
       logger.info(`🔔 检测到 ${amazonEmails.length} 封Amazon Web Services邮件`)
@@ -65,7 +65,7 @@ async function checkForAmazonSignal(): Promise<boolean> {
 /**
  * 检测并删除账号
  */
-async function detectAndDeleteAccounts(): Promise<DetectionResult> {
+async function detectAndDeleteAccounts(includeRead: boolean = false): Promise<DetectionResult> {
   const result: DetectionResult = {
     checked: true,
     amazonEmailsFound: 0,
@@ -86,7 +86,7 @@ async function detectAndDeleteAccounts(): Promise<DetectionResult> {
 
     // 获取所有Amazon邮件
     logger.info('📧 获取Amazon邮件列表...')
-    const amazonEmails = await checkAmazonEmails(emailConfig.qqEmail, emailConfig.authCode)
+    const amazonEmails = await checkAmazonEmails(emailConfig.qqEmail, emailConfig.authCode, includeRead)
     result.amazonEmailsFound = amazonEmails.length
 
     if (amazonEmails.length === 0) {
@@ -350,11 +350,12 @@ export function stopEmailDetectionScheduler(): void {
 
 /**
  * 手动触发检测（用于测试或手动触发）
+ * @param includeRead 是否包含已读邮件（默认true - 手动触发时检查所有邮件）
  */
-export async function triggerDetection(): Promise<DetectionResult> {
+export async function triggerDetection(includeRead: boolean = true): Promise<DetectionResult> {
   logger.info('🔧 手动触发邮箱检测...')
 
-  const hasSignal = await checkForAmazonSignal()
+  const hasSignal = await checkForAmazonSignal(includeRead)
 
   if (!hasSignal) {
     return {
@@ -368,5 +369,5 @@ export async function triggerDetection(): Promise<DetectionResult> {
     }
   }
 
-  return await detectAndDeleteAccounts()
+  return await detectAndDeleteAccounts(includeRead)
 }

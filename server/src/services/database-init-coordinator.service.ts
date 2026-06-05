@@ -11,7 +11,7 @@ const LOCK_TIMEOUT = 30000 // 30秒超时
 
 interface InitState {
   initialized: boolean
-  storageMode: 'json' | 'mysql' | 'redis'
+  storageMode: 'mysql' | 'redis'
   timestamp: number
   preCheckDone: boolean
   initializingPid?: number
@@ -75,7 +75,7 @@ export function tryBecomeInitializer(): boolean {
     // 写入初始化标记
     const state: InitState = {
       initialized: false,
-      storageMode: 'json',
+      storageMode: 'mysql',
       timestamp: Date.now(),
       preCheckDone: false,
       initializingPid: process.pid
@@ -93,7 +93,7 @@ export function tryBecomeInitializer(): boolean {
 /**
  * 标记预检已完成
  */
-export function markPreCheckDone(storageMode: 'json' | 'mysql' | 'redis') {
+export function markPreCheckDone(storageMode: 'mysql' | 'redis') {
   try {
     if (fs.existsSync(INIT_STATE_FILE)) {
       const content = fs.readFileSync(INIT_STATE_FILE, 'utf-8')
@@ -113,7 +113,7 @@ export function markPreCheckDone(storageMode: 'json' | 'mysql' | 'redis') {
 /**
  * 标记数据库初始化完成
  */
-export function markInitDone(storageMode: 'json' | 'mysql' | 'redis') {
+export function markInitDone(storageMode: 'mysql' | 'redis') {
   try {
     const state: InitState = {
       initialized: true,

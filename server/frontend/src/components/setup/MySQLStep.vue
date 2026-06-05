@@ -92,11 +92,11 @@ const handleNext = () => {
 const handleSkip = async () => {
   try {
     await saveDatabaseConfig({
-      storage: 'json',
+      storage: 'mysql',
       mysql: { host: '', port: 3306, user: '', password: '', database: 'KrioServer' },
       redis: { host: '', port: 6379, password: '', db: 0 }
     })
-    ElMessage.info('已选择 JSON 文件存储模式')
+    ElMessage.info('已跳过 MySQL 配置')
     emit('skip')
   } catch {
     ElMessage.error('保存配置失败')

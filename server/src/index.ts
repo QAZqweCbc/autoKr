@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Kiro Account Manager - Ubuntu Server Edition
  * 主入口文件
  */
@@ -10,7 +10,8 @@ import { Server as SocketIOServer } from 'socket.io'
 import { createServer } from 'http'
 import path from 'path'
 import { createProxyMiddleware } from 'http-proxy-middleware'
-import { initDatabase, closeDatabase, forceJsonFallback, getStorageMode } from './services/database.adapter'
+import { initDatabase, closeDatabase, getStorageMode } from './services/database.adapter'
+import { guardStartup } from './services/startup-guard.service'
 import { markPreCheckDone, cleanupInitState } from './services/database-init-coordinator.service'
 import { initWebSocket } from './websocket/socket.handler'
 import apiRoutes from './routes'
@@ -23,6 +24,7 @@ import {
   monitoringMiddleware 
 } from './middleware/health-check'
 import { validateEncryptionSetup } from './utils/crypto.util'
+import { validateDatabaseEnv } from './utils/env-validator'
 import { validateJwtSetup } from './middleware/auth.middleware'
 import { requestIdMiddleware } from './middleware/request-id.middleware'
 
@@ -66,8 +68,8 @@ function logStartupError(error: any) {
   } else {
     logger.error(`错误: ${error?.message || error}`, { stack: error?.stack })
     logger.error('常见问题排查:')
-    logger.error('1. 依赖未安装: npm install')
-    logger.error('2. 数据库初始化失败: 检查数据库配置')
+    logger.error('1. 配置不完整: 运行 npm run setup 完成初始化')
+    logger.error('2. 依赖未安装: npm install')
     logger.error('3. Playwright 未安装: npx playwright install chromium')
   }
 
@@ -202,26 +204,15 @@ async function start() {
     logger.info('🚀 Kiro Account Manager Server - 启动中...')
     logger.info('='.repeat(60))
 
-    // 预启动数据库检查
-    const { performPreStartupCheck } = await import('./services/pre-startup-check.service')
-    const preCheckResult = await performPreStartupCheck()
+    // 启动守卫：确保配置完整
+    await guardStartup()
 
-    // 标记预检完成（用于协调器共享状态）
-    markPreCheckDone(preCheckResult.storageMode)
+    // 启动前校验：数据库密码环境变量
+    validateDatabaseEnv()
 
-    // 如果预检结果建议降级到 JSON，强制使用 JSON 模式
-    if (preCheckResult.storageMode === 'json' && preCheckResult.warnings.length > 0) {
-      forceJsonFallback('预启动检查建议使用 JSON 模式')
-    }
-
-    // 初始化数据库（支持多进程共享）
+    // 初始化数据库
     logger.info('📦 初始化数据库...')
-    try {
-      await initDatabase()
-    } catch (error: any) {
-      forceJsonFallback(error?.message || '数据库初始化失败')
-      logger.warn('⚠️  已降级到 JSON 存储模式继续启动')
-    }
+    await initDatabase()
     logger.info(`📦 当前存储模式: ${getStorageMode().toUpperCase()}`)
 
     // 初始化账号删除日志表

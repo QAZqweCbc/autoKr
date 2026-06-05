@@ -1,12 +1,11 @@
-/**
+﻿/**
  * 数据库适配器 - 统一接口，支持 JSON、MySQL 和 Redis 动态切换
  */
 
 import { Task, TaskStats } from '../models/task.model'
 import { Account, AccountStats } from '../models/account.model'
-import { TaskDB as JSONTaskDB, AccountDB as JSONAccountDB, initDatabase as initJSON } from './database.service'
 import { MySQLTaskDB, initMySQL, closeMySQL } from './mysql.service'
-import { MySQLAccountDBNew as MySQLAccountDB } from './mysql-account.service'
+import { MySQLAccountDB } from './mysql-account.service'
 import { RedisTaskDB, RedisAccountDB } from './redis-storage.service'
 import { initRedis, closeRedis } from './redis.service'
 import { loadDatabaseConfig, DatabaseConfig } from './database-config.service'
@@ -22,35 +21,12 @@ import {
   getInitState
 } from './database-init-coordinator.service'
 
-let currentStorage: 'json' | 'mysql' | 'redis' = 'json'
+let currentStorage: 'mysql' | 'redis' = 'mysql'
 let config: DatabaseConfig
 let isInitialized = false
 let initializationPromise: Promise<void> | null = null
 let preCheckPassed = false  // 标记预检是否已通过
 let isInitializer = false  // 当前进程是否为初始化进程
-
-export function forceJsonFallback(reason: string) {
-  console.warn('\n' + '='.repeat(60))
-  console.warn('⚠️  数据库初始化失败，已自动降级到 JSON 存储模式')
-  console.warn('='.repeat(60))
-  console.warn(`原因: ${reason}`)
-  console.warn('提示:')
-  console.warn('  1. 服务会继续启动，不中断当前运行')
-  console.warn('  2. 当前数据将写入本地 JSON 文件')
-  console.warn('  3. 后续修复数据库配置后，重启服务即可恢复')
-  console.warn('='.repeat(60) + '\n')
-
-  currentStorage = 'json'
-  isInitialized = true
-  initJSON()
-}
-
-/**
- * 标记预检已通过（由预启动检查服务调用）
- */
-export function markPreCheckPassed() {
-  preCheckPassed = true
-}
 
 /**
  * 初始化数据库（根据配置自动选择，支持多进程共享初始化）
@@ -126,8 +102,7 @@ export async function initDatabase() {
         }
         await initRedis(config.redis)
       } else {
-        // 初始化 JSON 文件存储
-        initJSON()
+        throw new Error(`不支持的存储模式: ${currentStorage}。仅支持 'mysql' 或 'redis'`)
       }
 
       isInitialized = true
@@ -148,7 +123,7 @@ export async function initDatabase() {
 /**
  * 为当前进程创建数据库连接池（不执行表创建等初始化操作）
  */
-async function createConnectionPool(storageMode: 'json' | 'mysql' | 'redis') {
+async function createConnectionPool(storageMode: 'mysql' | 'redis') {
   config = loadDatabaseConfig()
 
   if (storageMode === 'mysql') {
@@ -195,8 +170,7 @@ async function createConnectionPool(storageMode: 'json' | 'mysql' | 'redis') {
     }
     await initRedis(config.redis)
   } else {
-    // JSON 模式无需特殊处理
-    initJSON()
+    throw new Error(`不支持的存储模式: ${storageMode}。仅支持 'mysql' 或 'redis'`)
   }
 }
 
@@ -210,7 +184,7 @@ export function isDatabaseInitialized(): boolean {
 /**
  * 等待数据库初始化完成
  */
-export async function waitForDatabaseInit(timeoutMs: number = 30000): Promise<void> {
+export async function waitForInitializationPromise(timeoutMs: number = 30000): Promise<void> {
   if (isInitialized) {
     return
   }
@@ -250,7 +224,7 @@ export function getStorageMode() {
  * 更新存储模式（用于热重载）
  * @internal 仅供 database-reload.service 使用
  */
-export function updateStorageMode(newStorage: 'json' | 'mysql' | 'redis') {
+export function updateStorageMode(newStorage: 'mysql' | 'redis') {
   console.log(`🔄 适配器存储模式更新: ${currentStorage} → ${newStorage}`)
   currentStorage = newStorage
   isInitialized = true
@@ -263,63 +237,51 @@ export const TaskDB = {
   async create(task: Omit<Task, 'created_at' | 'updated_at'>): Promise<Task> {
     const now = Date.now()
     const fullTask = { ...task, created_at: now, updated_at: now } as Task
-    
+
     if (currentStorage === 'mysql') {
       return await MySQLTaskDB.create(fullTask)
-    } else if (currentStorage === 'redis') {
-      return await RedisTaskDB.create(fullTask)
     } else {
-      return JSONTaskDB.create(task)
+      return await RedisTaskDB.create(fullTask)
     }
   },
 
   async getById(id: string): Promise<Task | null> {
     if (currentStorage === 'mysql') {
       return await MySQLTaskDB.getById(id)
-    } else if (currentStorage === 'redis') {
-      return await RedisTaskDB.getById(id)
     } else {
-      return JSONTaskDB.getById(id) || null
+      return await RedisTaskDB.getById(id)
     }
   },
 
   async getAll(status?: string): Promise<Task[]> {
     if (currentStorage === 'mysql') {
       return await MySQLTaskDB.getAll(status)
-    } else if (currentStorage === 'redis') {
-      return await RedisTaskDB.getAll(status)
     } else {
-      return JSONTaskDB.getAll(status)
+      return await RedisTaskDB.getAll(status)
     }
   },
 
   async updateStatus(id: string, status: Task['status'], error?: string): Promise<void> {
     if (currentStorage === 'mysql') {
       await MySQLTaskDB.updateStatus(id, status, error)
-    } else if (currentStorage === 'redis') {
-      await RedisTaskDB.updateStatus(id, status, error)
     } else {
-      JSONTaskDB.updateStatus(id, status, error)
+      await RedisTaskDB.updateStatus(id, status, error)
     }
   },
 
   async delete(id: string): Promise<void> {
     if (currentStorage === 'mysql') {
       await MySQLTaskDB.delete(id)
-    } else if (currentStorage === 'redis') {
-      await RedisTaskDB.delete(id)
     } else {
-      JSONTaskDB.delete(id)
+      await RedisTaskDB.delete(id)
     }
   },
 
   async getStats(): Promise<TaskStats> {
     if (currentStorage === 'mysql') {
       return await MySQLTaskDB.getStats()
-    } else if (currentStorage === 'redis') {
-      return await RedisTaskDB.getStats()
     } else {
-      return JSONTaskDB.getStats()
+      return await RedisTaskDB.getStats()
     }
   }
 }
@@ -330,73 +292,59 @@ export const AccountDB = {
   async create(account: Omit<Account, 'created_at'>): Promise<Account> {
     const now = Date.now()
     const fullAccount = { ...account, created_at: now } as Account
-    
+
     if (currentStorage === 'mysql') {
       return await MySQLAccountDB.create(fullAccount)
-    } else if (currentStorage === 'redis') {
-      return await RedisAccountDB.create(fullAccount)
     } else {
-      return JSONAccountDB.create(account)
+      return await RedisAccountDB.create(fullAccount)
     }
   },
 
   async getById(id: string): Promise<Account | null> {
     if (currentStorage === 'mysql') {
       return await MySQLAccountDB.getById(id)
-    } else if (currentStorage === 'redis') {
-      return await RedisAccountDB.getById(id)
     } else {
-      return JSONAccountDB.getById(id) || null
+      return await RedisAccountDB.getById(id)
     }
   },
 
   async getAll(): Promise<Account[]> {
     if (currentStorage === 'mysql') {
       return await MySQLAccountDB.getAll()
-    } else if (currentStorage === 'redis') {
-      return await RedisAccountDB.getAll()
     } else {
-      return JSONAccountDB.getAll()
+      return await RedisAccountDB.getAll()
     }
   },
 
   async delete(id: string): Promise<void> {
     if (currentStorage === 'mysql') {
       await MySQLAccountDB.delete(id)
-    } else if (currentStorage === 'redis') {
-      await RedisAccountDB.delete(id)
     } else {
-      JSONAccountDB.delete(id)
+      await RedisAccountDB.delete(id)
     }
   },
 
   async getStats(): Promise<AccountStats> {
     if (currentStorage === 'mysql') {
       return await MySQLAccountDB.getStats()
-    } else if (currentStorage === 'redis') {
-      return await RedisAccountDB.getStats()
     } else {
-      return JSONAccountDB.getStats()
+      return await RedisAccountDB.getStats()
     }
   },
 
   async getDomainStats(): Promise<Array<{ domain: string; count: number }>> {
     if (currentStorage === 'mysql') {
       return await MySQLAccountDB.getDomainStats()
-    } else if (currentStorage === 'redis') {
-      return await RedisAccountDB.getDomainStats()
     } else {
-      return JSONAccountDB.getDomainStats()
+      return await RedisAccountDB.getDomainStats()
     }
   },
 
   async getDailyStats(days: number = 7): Promise<Array<{ date: string; total: number; domain: string }>> {
     if (currentStorage === 'mysql') {
       return await MySQLAccountDB.getDailyStats(days)
-    } else if (currentStorage === 'redis') {
-      return await RedisAccountDB.getDailyStats(days)
     } else {
-      return JSONAccountDB.getDailyStats(days)
+      return await RedisAccountDB.getDailyStats(days)
     }
   },
 
@@ -475,10 +423,8 @@ export const AccountDB = {
   async update(id: string, updates: Partial<Account>): Promise<void> {
     if (currentStorage === 'mysql') {
       await MySQLAccountDB.update(id, updates)
-    } else if (currentStorage === 'redis') {
-      await RedisAccountDB.update(id, updates)
     } else {
-      JSONAccountDB.update(id, updates)
+      await RedisAccountDB.update(id, updates)
     }
   }
 }
@@ -495,5 +441,145 @@ export function getDB() {
     TaskDB,
     AccountDB,
     CheckDB: currentStorage === 'mysql' ? MySQLCheckDB : null
+  }
+}
+
+// ============================================
+// 数据库热重载（原 database-reload.service.ts）
+// ============================================
+
+/**
+ * 关闭当前数据库连接（供热重载使用）
+ */
+async function closeCurrentReloadConnections(): Promise<void> {
+  try {
+    if (currentStorage === 'mysql') {
+      try {
+        await closeMySQL()
+      } catch (error: any) {
+        console.warn('⚠️  关闭 MySQL 连接时出错:', error.message)
+      }
+
+      try {
+        await closeRedis()
+      } catch (error: any) {
+        console.warn('⚠️  关闭 Redis 连接时出错:', error.message)
+      }
+    } else if (currentStorage === 'redis') {
+      try {
+        await closeRedis()
+      } catch (error: any) {
+        console.warn('⚠️  关闭 Redis 连接时出错:', error.message)
+      }
+    }
+  } catch (error: any) {
+    console.warn('⚠️  关闭连接时出现警告:', error.message)
+  }
+}
+
+/**
+ * 重新加载数据库连接（热重载）
+ */
+export async function reloadDatabase(): Promise<void> {
+  console.log('\n' + '='.repeat(60))
+  console.log('🔄 开始热重载数据库连接...')
+  console.log('='.repeat(60))
+
+  const oldStorage = currentStorage
+  const config = loadDatabaseConfig()
+  const newStorage = config.storage
+
+  try {
+    // 1. 关闭现有连接
+    console.log('📤 关闭现有连接 (' + oldStorage.toUpperCase() + ')...')
+    await closeCurrentReloadConnections()
+
+    console.log('📥 切换到新存储模式: ' + newStorage.toUpperCase())
+
+    // 2. 初始化新连接
+    try {
+      if (newStorage === 'mysql') {
+        if (!config.mysql) {
+          throw new Error('MySQL 配置缺失')
+        }
+        console.log('🔌 正在连接 MySQL...')
+        await initMySQL(config.mysql)
+        console.log('✅ MySQL 连接成功')
+
+        if (config.redis && config.redis.host && config.redis.host.trim() !== '') {
+          try {
+            console.log('🔌 正在连接 Redis 缓存...')
+            await initRedis(config.redis)
+            console.log('✅ Redis 缓存已启用')
+          } catch (err: any) {
+            console.warn('⚠️  Redis 连接失败，将不使用缓存:', err.message)
+          }
+        }
+      } else if (newStorage === 'redis') {
+        if (!config.redis || !config.redis.host || config.redis.host.trim() === '') {
+          throw new Error('Redis 配置缺失或主机地址为空')
+        }
+        console.log('🔌 正在连接 Redis...')
+        await initRedis(config.redis)
+        console.log('✅ Redis 连接成功')
+      } else {
+        throw new Error(`不支持的存储模式: ${newStorage}。仅支持 'mysql' 或 'redis'`)
+      }
+
+      // 3. 更新全局状态（仅在成功时）
+      currentStorage = newStorage
+      isInitialized = true
+
+      console.log('='.repeat(60))
+      console.log('✅ 数据库热重载完成！')
+      console.log('   旧存储: ' + oldStorage.toUpperCase())
+      console.log('   新存储: ' + newStorage.toUpperCase())
+      console.log('='.repeat(60) + '\n')
+    } catch (initError: any) {
+      // 新存储模式初始化失败，尝试恢复原来的存储模式
+      console.error('❌ 新存储模式初始化失败:', initError.message)
+      console.log('\n🔄 尝试恢复原始存储模式: ' + oldStorage.toUpperCase() + '...')
+
+      try {
+        // 恢复原始存储模式
+        if (oldStorage === 'mysql') {
+          await initMySQL(config.mysql)
+          console.log('✅ MySQL 连接已恢复')
+
+          if (config.redis && config.redis.host && config.redis.host.trim() !== '') {
+            try {
+              await initRedis(config.redis)
+              console.log('✅ Redis 缓存已恢复')
+            } catch (err: any) {
+              console.warn('⚠️  Redis 连接失败，将不使用缓存:', err.message)
+            }
+          }
+        } else if (oldStorage === 'redis') {
+          await initRedis(config.redis)
+          console.log('✅ Redis 连接已恢复')
+        }
+
+        // 恢复全局状态
+        currentStorage = oldStorage
+        isInitialized = true
+
+        console.log('='.repeat(60))
+        console.log('⚠️  存储模式切换失败，已恢复原始模式')
+        console.log('   原因: ' + initError.message)
+        console.log('='.repeat(60) + '\n')
+
+        throw new Error(`无法切换到 ${newStorage.toUpperCase()} 模式: ${initError.message}`)
+      } catch (recoveryError: any) {
+        console.error('❌ 恢复原始存储模式失败:', recoveryError.message)
+        console.error('⚠️  系统可能处于不稳定状态，请手动重启服务器')
+        throw recoveryError
+      }
+    }
+  } catch (error: any) {
+    console.error('='.repeat(60))
+    console.error('❌ 数据库热重载失败:', error.message)
+    console.error('   堆栈:', error.stack)
+    console.error('='.repeat(60) + '\n')
+    throw error
   }
 }

@@ -1,9 +1,10 @@
-/**
+﻿/**
  * MySQL 数据库服务
  */
 
 import mysql from 'mysql2/promise'
-import { Account, Task } from './database.service'
+import { Account } from '../models/account.model'
+import { Task } from '../models/task.model'
 
 let pool: mysql.Pool | null = null
 

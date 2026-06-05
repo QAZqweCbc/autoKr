@@ -111,6 +111,49 @@ export async function getEmailConfig(req: Request, res: Response) {
 }
 
 /**
+ * 验证邮箱配置解密状态
+ */
+export async function verifyEmailConfigDecryption(req: Request, res: Response) {
+  try {
+    const decrypted = await getEmailConfigForInternal()
+
+    if (!decrypted) {
+      return res.json({
+        success: true,
+        status: 'no_config',
+        message: '未配置邮箱信息'
+      })
+    }
+
+    const authCodeOk = decrypted.authCode && decrypted.authCode !== '******'
+    const gmailPasswordOk = !decrypted.gmailAppPassword || decrypted.gmailAppPassword !== '******'
+
+    res.json({
+      success: true,
+      status: 'verified',
+      decryption: {
+        authCode: {
+          isSet: !!decrypted.authCode,
+          isDecrypted: authCodeOk,
+          preview: authCodeOk ? decrypted.authCode.substring(0, 4) + '****' : '未解密'
+        },
+        gmailPassword: {
+          isSet: !!decrypted.gmailAppPassword,
+          isDecrypted: gmailPasswordOk
+        }
+      },
+      message: authCodeOk ? '✅ 授权码已正确加密并可解密' : '⚠️ 授权码未正确配置'
+    })
+  } catch (error: any) {
+    console.error('验证解密失败:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+}
+
+/**
  * 更新邮箱配置
  */
 export async function updateEmailConfig(req: Request, res: Response) {

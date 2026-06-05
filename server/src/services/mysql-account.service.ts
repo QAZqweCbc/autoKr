@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MySQL 账号服务 - 使用新的嵌套数据结构
  */
 
@@ -7,7 +7,7 @@ import { Account, AccountStats } from '../models/account.model'
 import { accountToFlat, flatToAccount, updateAccountUsage } from '../utils/account-mapper'
 import { withTransaction } from '../utils/transaction.util'
 
-export const MySQLAccountDBNew = {
+export const MySQLAccountDB = {
   /**
    * 创建账号（使用事务保护）
    */

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 自动审批服务
  * 处理申请和释放的自动审批逻辑
  */
@@ -6,7 +6,7 @@
 import { TokenAllocationService } from './token-allocation.service'
 import { findClientUserById } from './client-user.service'
 import { selectAvailableAccount } from './token-availability.service'
-import { MySQLAccountDBNew as MySQLAccountDB } from './mysql-account.service'
+import { MySQLAccountDB } from './mysql-account.service'
 import { triggerAccountGeneration, getAccountPoolStatus } from './account-pool.service'
 import { emitSystemMessage, emitAdminRefreshRequests, emitAdminRefreshRevokeRequests, emitAdminRefreshAllocations } from '../websocket/socket.handler'
 

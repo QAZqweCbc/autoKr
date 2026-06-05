@@ -5,8 +5,9 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
-import { initDatabase, forceJsonFallback, getStorageMode, closeDatabase } from '../services/database.adapter'
+import { initDatabase, getStorageMode, closeDatabase } from '../services/database.adapter'
 import { markPreCheckDone } from '../services/database-init-coordinator.service'
+import { guardStartup } from '../services/startup-guard.service'
 import authRoutes from './routes/auth.routes'
 import tokenRoutes from './routes/token.routes'
 import { validateEncryptionSetup } from '../utils/crypto.util'
@@ -113,26 +114,12 @@ async function start() {
     console.log('🚀 Kiro 注册认证服务 - 启动中...')
     console.log('='.repeat(60))
 
-    // 预启动数据库检查
-    const { performPreStartupCheck } = await import('../services/pre-startup-check.service')
-    const preCheckResult = await performPreStartupCheck()
-
-    // 标记预检完成（用于协调器共享状态）
-    markPreCheckDone(preCheckResult.storageMode)
-
-    // 如果预检结果建议降级到 JSON，强制使用 JSON 模式
-    if (preCheckResult.storageMode === 'json' && preCheckResult.warnings.length > 0) {
-      forceJsonFallback('预启动检查建议使用 JSON 模式')
-    }
+    // 启动守卫：检查必需配置
+    await guardStartup() // This throws if not configured
 
     // 初始化数据库（支持多进程共享）
     console.log('\n📦 初始化数据库...')
-    try {
-      await initDatabase()
-    } catch (error: any) {
-      forceJsonFallback(error?.message || '数据库初始化失败')
-      console.warn('⚠️  已降级到 JSON 存储模式继续启动')
-    }
+    await initDatabase()
     console.log(`📦 当前存储模式: ${getStorageMode().toUpperCase()}`)
     
     // 启动HTTP服务器

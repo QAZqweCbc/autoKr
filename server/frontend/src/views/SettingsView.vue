@@ -178,7 +178,7 @@
               <div style="display: flex; align-items: center; gap: 12px;">
                 <span style="color: #6b7280; min-width: 100px;">存储模式:</span>
                 <el-tag :type="dbConfig.storage === 'mysql' ? 'success' : 'info'">
-                  {{ dbConfig.storage === 'mysql' ? 'MySQL 数据库' : dbConfig.storage === 'redis' ? 'Redis 存储' : 'JSON 文件' }}
+                  {{ dbConfig.storage === 'mysql' ? 'MySQL 数据库' : 'Redis 存储' }}
                 </el-tag>
               </div>
 
@@ -217,28 +217,10 @@
             <div class="form-section">
               <label class="form-label">存储模式</label>
               <el-select v-model="dbForm.storage" size="large" style="width: 100%;">
-                <el-option label="JSON 文件存储" value="json" />
                 <el-option label="MySQL 数据库" value="mysql" />
                 <el-option label="Redis 存储" value="redis" />
               </el-select>
             </div>
-
-            <!-- JSON 模式提示 -->
-            <template v-if="dbForm.storage === 'json'">
-              <el-alert
-                type="info"
-                :closable="false"
-                style="margin-top: 20px;"
-              >
-                <template #title>
-                  <div style="font-size: 14px;">
-                    <strong>📁 JSON 文件存储</strong>
-                    <p style="margin: 8px 0 0 0;">数据将存储在本地 JSON 文件中，适合小规模使用和开发测试。</p>
-                    <p style="margin: 4px 0 0 0; color: #666;">无需额外配置，开箱即用。</p>
-                  </div>
-                </template>
-              </el-alert>
-            </template>
 
             <!-- MySQL 配置 -->
             <template v-if="dbForm.storage === 'mysql'">
@@ -439,7 +421,7 @@ const originalPasswords = ref({
 })
 
 const dbConfig = ref<DatabaseConfig>({
-  storage: 'json',
+  storage: 'mysql',
   mysql: {
     host: '',
     port: 3306,
@@ -456,7 +438,7 @@ const dbConfig = ref<DatabaseConfig>({
 })
 
 const dbForm = ref<DatabaseConfig>({
-  storage: 'json',
+  storage: 'mysql',
   mysql: {
     host: '',
     port: 3306,

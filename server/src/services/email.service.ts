@@ -73,7 +73,9 @@ export async function fetchQQEmail(
                     uid: uid,
                     subject: parsed.subject || '',
                     from: parsed.from?.text || '',
-                    to: parsed.to?.text || '',
+                    to: (Array.isArray(parsed.to)
+                 ? (parsed.to.length > 0 ? parsed.to[0].text || parsed.to.map(a => a.text).join(', ') : '')
+                 : parsed.to?.text) || '',
                     date: parsed.date || new Date(),
                     text: parsed.text,
                     html: parsed.html as string
@@ -197,17 +199,21 @@ export async function deleteEmail(
 
 /**
  * 检测Amazon Web Services邮件
- * 只检查未读邮件，避免重复处理历史邮件
+ * @param email 邮箱地址
+ * @param authCode 授权码
+ * @param includeRead 是否包含已读邮件（默认false - 仅检查未读）
  */
 export async function checkAmazonEmails(
   email: string,
-  authCode: string
+  authCode: string,
+  includeRead: boolean = false
 ): Promise<EmailMessage[]> {
-  // 只获取未读邮件
-  const unreadMessages = await fetchQQEmail(email, authCode, ['UNSEEN'])
+  // 根据参数决定是否包含已读邮件
+  const searchCriteria = includeRead ? ['ALL'] : ['UNSEEN']
+  const messages = await fetchQQEmail(email, authCode, searchCriteria)
 
   // 过滤Amazon Web Services邮件
-  return unreadMessages.filter(msg => {
+  return messages.filter(msg => {
     const fromLower = msg.from.toLowerCase()
     return fromLower.includes('amazon web services')
   })

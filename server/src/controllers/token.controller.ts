@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Token 控制器 - 处理 SSO Token 提交和账号分发
  */
 
@@ -713,7 +713,7 @@ export async function syncAccountUsage(req: Request, res: Response) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             clientId: account.credentials.clientId,
-            clientSecret: account.credentialet,
+            clientSecret: account.credentials.clientSecret,
             refreshToken: account.credentials.refreshToken,
             grantType: 'refresh_token'
           })

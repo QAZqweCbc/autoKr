@@ -50,7 +50,7 @@
           <div style="display: flex; align-items: center; gap: 12px;">
             <span style="color: #6b7280; min-width: 100px;">存储模式:</span>
             <el-tag :type="currentConfig.storage === 'mysql' ? 'success' : 'info'">
-              {{ currentConfig.storage === 'mysql' ? 'MySQL 数据库' : 'JSON 文件' }}
+              {{ currentConfig.storage === 'mysql' ? 'MySQL 数据库' : 'Redis 存储' }}
             </el-tag>
           </div>
 
@@ -88,7 +88,6 @@
         <el-form :model="form" label-width="140px">
           <el-form-item label="存储模式">
             <el-select v-model="form.storage" @change="handleStorageChange">
-              <el-option label="JSON 文件存储" value="json" />
               <el-option label="MySQL 数据库" value="mysql" />
               <el-option label="Redis 存储" value="redis" />
             </el-select>
@@ -253,7 +252,7 @@ const testingRedis = ref(false)
 const configSource = ref<ConfigSource | null>(null)
 
 const currentConfig = ref<DatabaseConfig>({
-  storage: 'json',
+  storage: 'mysql',
   mysql: {
     host: '',
     port: 3306,
@@ -270,7 +269,7 @@ const currentConfig = ref<DatabaseConfig>({
 })
 
 const form = ref<DatabaseConfig>({
-  storage: 'json',
+  storage: 'mysql',
   mysql: {
     host: '',
     port: 3306,

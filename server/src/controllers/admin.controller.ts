@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 管理员控制器
  * 处理管理员登录、审批、用户管理等功能
  */
@@ -16,7 +16,7 @@ import {
   updateLastLogin
 } from '../services/client-user.service'
 import { getPool } from '../services/mysql.service'
-import { MySQLAccountDBNew as MySQLAccountDB } from '../services/mysql-account.service'
+import { MySQLAccountDB } from '../services/mysql-account.service'
 import { isAccountAvailable } from '../services/token-availability.service'
 import { flatToAccount } from '../utils/account-mapper'
 

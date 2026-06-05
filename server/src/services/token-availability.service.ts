@@ -1,10 +1,10 @@
-/**
+﻿/**
  * Token可用性检测服务
  * 检测账户是否可用并选择最佳账户
  */
 
 import { Account } from '../models/account.model'
-import { MySQLAccountDBNew as MySQLAccountDB } from './mysql-account.service'
+import { MySQLAccountDB } from './mysql-account.service'
 import { syncAccountUsage } from './kiro-api.service'
 import { updateAccountUsage } from '../utils/account-mapper'
 

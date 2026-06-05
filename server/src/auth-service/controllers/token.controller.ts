@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Token控制器
  * 处理用户Token申请和查询
  */
@@ -8,7 +8,7 @@ import { OidcTokenResponse } from '../../models/token.model'
 import { v4 as uuidv4 } from 'uuid'
 import { TokenAllocationService } from '../../services/token-allocation.service'
 import { findClientUserById } from '../../services/client-user.service'
-import { MySQLAccountDBNew as MySQLAccountDB } from '../../services/mysql-account.service'
+import { MySQLAccountDB } from '../../services/mysql-account.service'
 import { updateAccountUsage } from '../../utils/account-mapper'
 
 /**

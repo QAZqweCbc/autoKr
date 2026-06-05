@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 数据库配置控制器
  */
 
@@ -81,7 +81,7 @@ export async function updateDatabaseConfig(req: Request, res: Response) {
         console.log('正在热重载数据库连接...')
         
         // 动态导入以避免循环依赖
-        const { reloadDatabase } = await import('../services/database-reload.service')
+        const { reloadDatabase } = await import('../services/database.adapter')
         await reloadDatabase()
         
         reloadResult.reloaded = true

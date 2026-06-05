@@ -3,13 +3,14 @@
  */
 
 import { Router } from 'express'
-import { 
-  getConfig, 
-  updateConfigHandler, 
+import {
+  getConfig,
+  updateConfigHandler,
   testConnection,
   getEmailConfig,
   updateEmailConfig,
   testEmailConnection,
+  verifyEmailConfigDecryption,
   getAutoRefreshConfig,
   saveAutoRefreshConfig,
   getConfigChangeHistory,
@@ -25,6 +26,7 @@ const router = Router()
 
 router.get('/', getConfig)
 router.get('/email', getEmailConfig)
+router.get('/email/verify-decryption', verifyEmailConfigDecryption)
 router.get('/auto-refresh', getAutoRefreshConfig)
 router.get('/changes', getConfigChangeHistory)
 router.get('/migrations', getConfigMigrationHistory)
