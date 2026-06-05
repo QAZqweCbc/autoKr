@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 数据库配置服务
  * 支持环境变量、JSON文件和默认值的三级配置优先级
  */
@@ -11,7 +11,7 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'database.config.json')
 const OLD_CONFIG_FILE = path.join(__dirname, '../../data/config.json')
 
 export interface DatabaseConfig {
-  storage: 'json' | 'mysql' | 'redis'
+  storage: 'mysql' | 'redis'
   mysql: {
     host: string
     port: number
@@ -29,7 +29,7 @@ export interface DatabaseConfig {
 
 // 默认配置
 const DEFAULT_CONFIG: DatabaseConfig = {
-  storage: 'json',
+  storage: 'mysql',
   mysql: {
     host: 'localhost',
     port: 3306,
@@ -53,17 +53,17 @@ function loadFromEnv(): Partial<DatabaseConfig> {
   
   // 存储类型
   if (process.env.DATABASE_STORAGE) {
-    config.storage = process.env.DATABASE_STORAGE as 'json' | 'mysql' | 'redis'
+    config.storage = process.env.DATABASE_STORAGE as 'mysql' | 'redis'
   }
   
   // MySQL 配置
-  if (process.env.MYSQL_HOST || process.env.MYSQL_PORT || 
-      process.env.MYSQL_USER || process.env.MYSQL_PASSWORD) {
+  if (process.env.DB_PASSWORD || process.env.MYSQL_HOST || process.env.MYSQL_PORT || 
+      process.env.MYSQL_USER || process.env.MYSQL_PASSWORD || process.env.DB_PASSWORD) {
     config.mysql = {
       host: process.env.MYSQL_HOST || DEFAULT_CONFIG.mysql.host,
       port: parseInt(process.env.MYSQL_PORT || String(DEFAULT_CONFIG.mysql.port)),
       user: process.env.MYSQL_USER || DEFAULT_CONFIG.mysql.user,
-      password: process.env.MYSQL_PASSWORD || DEFAULT_CONFIG.mysql.password,
+      password: process.env.DB_PASSWORD || process.env.MYSQL_PASSWORD || DEFAULT_CONFIG.mysql.password,
       database: process.env.MYSQL_DATABASE || DEFAULT_CONFIG.mysql.database
     }
   }
@@ -117,7 +117,7 @@ function migrateFromOldConfig(): boolean {
     
     // 提取数据库配置
     const dbConfig: DatabaseConfig = {
-      storage: oldConfig.storage || 'json',
+      storage: oldConfig.storage || 'mysql',
       mysql: oldConfig.mysql || DEFAULT_CONFIG.mysql,
       redis: oldConfig.redis || DEFAULT_CONFIG.redis
     }
@@ -150,11 +150,23 @@ export function loadDatabaseConfig(): DatabaseConfig {
   if (!existsSync(CONFIG_FILE)) {
     migrateFromOldConfig()
   }
-  
+
   // 加载配置（按优先级合并）
   const envConfig = loadFromEnv()
   const fileConfig = loadFromFile()
-  
+
+
+  // 字段级别的合并，而不是对象级别的合并
+  const redisConfig = {
+    ...DEFAULT_CONFIG.redis,
+    ...fileConfig.redis,
+    // 仅当环境变量明确提供时才覆盖
+    ...(process.env.REDIS_HOST && { host: process.env.REDIS_HOST }),
+    ...(process.env.REDIS_PORT && { port: parseInt(process.env.REDIS_PORT) }),
+    ...(process.env.REDIS_PASSWORD && { password: process.env.REDIS_PASSWORD }),
+    ...(process.env.REDIS_DB && { db: parseInt(process.env.REDIS_DB) })
+  }
+
   const config: DatabaseConfig = {
     storage: envConfig.storage || fileConfig.storage || DEFAULT_CONFIG.storage,
     mysql: {
@@ -162,13 +174,9 @@ export function loadDatabaseConfig(): DatabaseConfig {
       ...fileConfig.mysql,
       ...envConfig.mysql
     },
-    redis: {
-      ...DEFAULT_CONFIG.redis,
-      ...fileConfig.redis,
-      ...envConfig.redis
-    }
+    redis: redisConfig
   }
-  
+
   return config
 }
 
@@ -212,12 +220,12 @@ export function getMaskedConfig(config: DatabaseConfig): DatabaseConfig {
  */
 export function validateDatabaseConfig(config: DatabaseConfig): { valid: boolean; errors: string[] } {
   const errors: string[] = []
-  
+
   // 验证存储类型
-  if (!['json', 'mysql', 'redis'].includes(config.storage)) {
-    errors.push('存储类型必须是 json、mysql 或 redis')
+  if (!['mysql', 'redis'].includes(config.storage)) {
+    errors.push('存储类型必须是 mysql 或 redis')
   }
-  
+
   // 验证 MySQL 配置
   if (config.storage === 'mysql') {
     if (!config.mysql.host) errors.push('MySQL 主机地址不能为空')
@@ -227,7 +235,7 @@ export function validateDatabaseConfig(config: DatabaseConfig): { valid: boolean
       errors.push('MySQL 端口必须在 1-65535 之间')
     }
   }
-  
+
   // 验证 Redis 配置
   if (config.storage === 'redis') {
     if (!config.redis.host) errors.push('Redis 主机地址不能为空')
@@ -238,7 +246,7 @@ export function validateDatabaseConfig(config: DatabaseConfig): { valid: boolean
       errors.push('Redis 数据库编号必须在 0-15 之间')
     }
   }
-  
+
   return {
     valid: errors.length === 0,
     errors
