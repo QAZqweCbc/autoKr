@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import path from 'path'
 
-const CONFIG_DIR = path.join(__dirname, '../../data')
+const CONFIG_DIR = path.join(process.cwd(), 'data')
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json')
 
 export interface BrowserConfig {

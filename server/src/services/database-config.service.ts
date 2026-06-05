@@ -6,9 +6,9 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import path from 'path'
 
-const CONFIG_DIR = path.join(__dirname, '../../config')
+const CONFIG_DIR = path.join(process.cwd(), 'config')
 const CONFIG_FILE = path.join(CONFIG_DIR, 'database.config.json')
-const OLD_CONFIG_FILE = path.join(__dirname, '../../data/config.json')
+const OLD_CONFIG_FILE = path.join(process.cwd(), 'data/config.json')
 
 export interface DatabaseConfig {
   storage: 'mysql' | 'redis'

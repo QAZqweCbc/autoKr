@@ -6,7 +6,7 @@
 import fs from 'fs'
 import path from 'path'
 
-const INIT_STATE_FILE = path.join(__dirname, '../../.db-init-state.json')
+const INIT_STATE_FILE = path.join(process.cwd(), '.db-init-state.json')
 const LOCK_TIMEOUT = 30000 // 30秒超时
 
 interface InitState {

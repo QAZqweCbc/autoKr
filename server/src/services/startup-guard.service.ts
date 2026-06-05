@@ -7,7 +7,7 @@ import { existsSync, unlinkSync } from 'fs'
 import path from 'path'
 import { loadDatabaseConfig, DatabaseConfig } from './database-config.service'
 
-const SETUP_COMPLETE_FILE = path.join(__dirname, '../../.setup-completed')
+const SETUP_COMPLETE_FILE = path.join(process.cwd(), '.setup-completed')
 
 /**
  * 启动守护错误类

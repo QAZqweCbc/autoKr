@@ -177,7 +177,7 @@ export function resetSetup(req: Request, res: Response) {
   try {
     const fs = require('fs')
     const path = require('path')
-    const setupFile = path.join(__dirname, '../../.setup-completed')
+    const setupFile = path.join(process.cwd(), '.setup-completed')
 
     if (fs.existsSync(setupFile)) {
       fs.unlinkSync(setupFile)

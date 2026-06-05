@@ -43,15 +43,15 @@ export const logger = winston.createLogger({
   transports: [
     // 错误日志
     new winston.transports.File({
-      filename: path.join(__dirname, '../../logs/error.log'),
+      filename: path.join(process.cwd(), 'logs/error.log'),
       level: 'error',
       maxsize: 5242880, // 5MB
       maxFiles: 5
     }),
-    
+
     // 组合日志
     new winston.transports.File({
-      filename: path.join(__dirname, '../../logs/combined.log'),
+      filename: path.join(process.cwd(), 'logs/combined.log'),
       maxsize: 5242880, // 5MB
       maxFiles: 5
     }),

@@ -10,8 +10,8 @@ import * as path from 'path'
 import * as crypto from 'crypto'
 import { loadDatabaseConfig, saveDatabaseConfig, DatabaseConfig } from './database-config.service'
 
-const ENV_FILE = path.join(__dirname, '../../.env')
-const SETUP_COMPLETE_FILE = path.join(__dirname, '../../.setup-completed')
+const ENV_FILE = path.join(process.cwd(), '.env')
+const SETUP_COMPLETE_FILE = path.join(process.cwd(), '.setup-completed')
 
 /**
  * 配置状态接口

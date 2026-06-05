@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { CheckRecord, CheckRecordCreateDTO, CheckStats } from '../models/check.model'
 import { getDB } from './database.adapter'
 
-const DATA_DIR = path.join(__dirname, '../../data')
+const DATA_DIR = path.join(process.cwd(), 'data')
 const CHECK_RECORDS_FILE = path.join(DATA_DIR, 'check_records.json')
 
 // 确保数据目录存在

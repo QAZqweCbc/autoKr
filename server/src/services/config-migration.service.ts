@@ -8,7 +8,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import path from 'path'
 import { ServerConfig } from './config.service'
 
-const MIGRATION_LOG_DIR = path.join(__dirname, '../../logs')
+const MIGRATION_LOG_DIR = path.join(process.cwd(), 'logs')
 const MIGRATION_LOG_FILE = path.join(MIGRATION_LOG_DIR, 'config-migrations.log')
 
 export interface MigrationResult {

@@ -7,7 +7,7 @@
 import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'fs'
 import path from 'path'
 
-const LOG_DIR = path.join(__dirname, '../../logs')
+const LOG_DIR = path.join(process.cwd(), 'logs')
 const CONFIG_CHANGE_LOG = path.join(LOG_DIR, 'config-changes.log')
 
 export interface ConfigChange {
