@@ -1,5 +1,5 @@
-/**
- * 注册认证服务 - 独立服务（端口2233）
+﻿/**
+ * 注册认证服务 - 独立服务（端口 2233）
  */
 
 import 'dotenv/config'
@@ -27,7 +27,7 @@ const PORT = process.env.AUTH_PORT || 2233
 // ============================================
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [
   'http://localhost:1455',
-  'http://localhost:5173',  // Vite dev server
+  'http://localhost:5173',
   'http://127.0.0.1:1455',
   'http://127.0.0.1:5173'
 ]
@@ -37,9 +37,7 @@ console.log('🔒 [Auth Service] CORS 允许的来源:', ALLOWED_ORIGINS)
 // 中间件
 app.use(cors({
   origin: (origin, callback) => {
-    // 允许无 origin 的请求（如 Postman、curl、服务器端请求）
     if (!origin) return callback(null, true)
-    
     if (ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true)
     } else {
@@ -63,7 +61,7 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'auth-service', port: PORT })
 })
 
-// 根路径
+// 根路由
 app.get('/', (_req, res) => {
   res.json({ 
     service: 'Kiro Auth Service',
@@ -114,20 +112,30 @@ async function start() {
     console.log('🚀 Kiro 注册认证服务 - 启动中...')
     console.log('='.repeat(60))
 
-    // 启动守卫：检查必需配置
-    await guardStartup() // This throws if not configured
+    // 启动守卫：非阻塞检查
+    const guardResult = await guardStartup()
 
-    // 初始化数据库（支持多进程共享）
-    console.log('\n📦 初始化数据库...')
-    await initDatabase()
-    console.log(`📦 当前存储模式: ${getStorageMode().toUpperCase()}`)
+    if (guardResult.needsSetup) {
+      console.log('⚠️  系统未完成配置，请访问 /setup 完成初始化')
+    } else if (!guardResult.configValid) {
+      console.warn('⚠️  数据库配置无效:', guardResult.configError)
+    }
+
+    // 初始化数据库（仅当配置完成时才初始化）
+    if (guardResult.setupCompleted && guardResult.configValid) {
+      console.log('\n📦 初始化数据库...')
+      await initDatabase()
+      console.log(`📦 当前存储模式: ${getStorageMode().toUpperCase()}`)
+    } else {
+      console.log('\nℹ️  跳过数据库初始化（配置未完成）')
+    }
     
     // 启动HTTP服务器
     app.listen(PORT, () => {
       console.log('\n' + '='.repeat(60))
       console.log('✅ 注册认证服务启动成功！')
       console.log('='.repeat(60))
-      console.log(`📡 HTTP 服务: http://0.0.0.0:${PORT}`)
+      console.log(`🔗 HTTP 服务: http://0.0.0.0:${PORT}`)
       console.log('='.repeat(60))
       console.log('\n📚 API 端点:')
       console.log(`   GET  /health                     - 健康检查`)
@@ -141,7 +149,7 @@ async function start() {
       console.log('='.repeat(60))
       console.log('\n💡 提示:')
       console.log('   - 此服务运行在独立端口2233')
-      console.log('   - 主服务运行在端口3000')
+      console.log('   - 主服务运行在端口1455')
       console.log('   - 按 Ctrl+C 停止服务器')
       console.log('')
     })

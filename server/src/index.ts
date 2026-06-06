@@ -4,15 +4,15 @@
  */
 
 import 'dotenv/config'
-import express from 'express'
+import express, { Request, Response } from 'express'
 import cors from 'cors'
 import { Server as SocketIOServer } from 'socket.io'
 import { createServer } from 'http'
 import path from 'path'
 import { createProxyMiddleware } from 'http-proxy-middleware'
 import { initDatabase, closeDatabase, getStorageMode } from './services/database.adapter'
-import { guardStartup } from './services/startup-guard.service'
-import { markPreCheckDone, cleanupInitState } from './services/database-init-coordinator.service'
+import { guardStartup, StartupGuardResult } from './services/startup-guard.service'
+import { cleanupInitState } from './services/database-init-coordinator.service'
 import { initWebSocket } from './websocket/socket.handler'
 import apiRoutes from './routes'
 import { logger, requestLogger } from './utils/logger'
@@ -38,6 +38,9 @@ const app = express()
 const httpServer = createServer(app)
 
 const PORT = process.env.PORT || 1455
+
+// 存储守护检查结果，供路由判断是否需要显示 setup 页面
+let guardResult: StartupGuardResult | null = null
 
 async function cleanupStartupResources() {
   try {
@@ -90,25 +93,21 @@ logger.info('🔒 CORS 允许的来源:', ALLOWED_ORIGINS)
 
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: ALLOWED_ORIGINS,  // 使用相同的CORS配置
+    origin: ALLOWED_ORIGINS,
     methods: ['GET', 'POST'],
     credentials: true
   },
-  // 调整心跳配置：只在有实际操作时才响应
-  pingInterval: 60000,  // 心跳间隔：60秒（默认25秒）
-  pingTimeout: 30000,   // 心跳超时：30秒（默认20秒）
+  pingInterval: 60000,
+  pingTimeout: 30000,
   transports: ['websocket', 'polling']
 })
 
-// 将 io 实例挂载到 app，供健康检查使用
 ;(app as any).io = io
 
 // 中间件
 app.use(cors({
   origin: (origin, callback) => {
-    // 允许无 origin 的请求（如 Postman、curl、服务器端请求）
     if (!origin) return callback(null, true)
-    
     if (ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true)
     } else {
@@ -116,18 +115,12 @@ app.use(cors({
       callback(new Error(`来源 ${origin} 不在允许列表中`))
     }
   },
-  credentials: true,  // 允许携带凭证
-  maxAge: 86400  // 预检请求缓存24小时
+  credentials: true,
+  maxAge: 86400
 }))
 app.use(express.json())
-
-// Request ID 追踪中间件（必须在其他中间件之前）
 app.use(requestIdMiddleware)
-
-// 监控中间件（记录请求指标）
 app.use(monitoringMiddleware)
-
-// 统一日志中间件
 app.use(requestLogger)
 
 // 健康检查端点（不需要限流）
@@ -135,66 +128,61 @@ app.get('/health', healthCheckHandler)
 app.get('/health-basic', simpleHealthCheck)
 app.get('/metrics', metricsHandler)
 
-// API 限流（应用到所有 API 路由）
+// 系统健康检查：集成守护检查结果
+app.get('/api/system/health', (req, res) => {
+  const status: Record<string, any> = {
+    setupCompleted: guardResult?.setupCompleted ?? false,
+    mysqlOk: guardResult?.mysqlOk ?? false,
+    redisOk: guardResult?.redisOk ?? false,
+    configValid: guardResult?.configValid ?? false,
+  }
+
+  // 如果有数据库连接，也报告
+  if (getStorageMode) {
+    status.storageMode = getStorageMode().toUpperCase()
+  }
+
+  res.json({ success: true, data: status })
+})
+
+// API 限流
 app.use('/api', apiLimiter)
 
-// 代理认证服务的请求到端口 2233
+// 配置向导 API 路由（必须在静态文件之前）
+import setupRoutes from './routes/setup.routes'
+app.use('/api/setup', setupRoutes)
+
+// 数据库配置 API 路由
+import databaseConfigRoutes from './routes/database-config.routes'
+app.use('/api/database', databaseConfigRoutes)
+
+
+// 代理认证服务请求到端口 2233
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:2233'
+logger.info(`配置认证服务代理: ${AUTH_SERVICE_URL}`)
 
-logger.info(`🔗 配置认证服务代理: ${AUTH_SERVICE_URL}`)
-
-// 代理 /api/auth 路由到认证服务
-app.use('/api/auth', createProxyMiddleware({
+const authProxy = createProxyMiddleware({
   target: AUTH_SERVICE_URL,
   changeOrigin: true,
-  on: {
-    proxyReq: (proxyReq, req) => {
-      logger.info(`[Proxy Auth] ${req.method} ${req.url} -> ${AUTH_SERVICE_URL}${req.url}`)
-    },
-    error: (err, req, res) => {
-      logger.error(`[Proxy Auth Error] ${req.method} ${req.url}:`, err.message)
-      ;(res as express.Response).status(502).json({
-        success: false,
-        error: {
-          code: 502,
-          message: '认证服务暂时不可用，请确保认证服务正在运行'
-        }
-      })
-    }
-  }
-}))
+  pathRewrite: (p) => p
+})
+app.use('/api/auth', authProxy as any)
 
-// 代理 /api/tokens 路由到认证服务
-app.use('/api/tokens', createProxyMiddleware({
-  target: AUTH_SERVICE_URL,
-  changeOrigin: true,
-  on: {
-    proxyReq: (proxyReq, req) => {
-      logger.info(`[Proxy Tokens] ${req.method} ${req.url} -> ${AUTH_SERVICE_URL}${req.url}`)
-    },
-    error: (err, req, res) => {
-      logger.error(`[Proxy Tokens Error] ${req.method} ${req.url}:`, err.message)
-      ;(res as express.Response).status(502).json({
-        success: false,
-        error: {
-          code: 502,
-          message: 'Token服务暂时不可用，请确保认证服务正在运行'
-        }
-      })
-    }
-  }
-}))
 
-// API 路由（其他路由）
-app.use('/api', apiRoutes)
+// Setup 页面：当需要配置时，直接返回 setup 页面
+const SETUP_WIZARD_PUBLIC = path.join(__dirname, 'setup-wizard', 'public')
+const FRONTEND_DIST = path.join(__dirname, '../frontend/dist')
 
-// 静态文件服务
-app.use(express.static(path.join(__dirname, '../frontend/dist')))
+if (require("fs").existsSync(SETUP_WIZARD_PUBLIC)) {
+  app.use('/setup', express.static(SETUP_WIZARD_PUBLIC))
+  app.get('/setup/*', (_req, res) => {
+    res.sendFile(path.join(SETUP_WIZARD_PUBLIC, 'index.html'))
+  })
+}
 
-// SPA 路由回退支持（必须在最后）
-// 所有GET请求如果没有匹配到静态文件或API，返回index.html
-app.get(/^\/(?!api).*/, (_req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'))
+// 所有 GET 请求如果没有匹配到 API 或静态文件，返回前端 index.html
+app.get(/^\/(?!api|setup).*/, (_req, res) => {
+  res.sendFile(path.join(FRONTEND_DIST, 'index.html'))
 })
 
 // 启动服务器
@@ -204,21 +192,31 @@ async function start() {
     logger.info('🚀 Kiro Account Manager Server - 启动中...')
     logger.info('='.repeat(60))
 
-    // 启动守卫：确保配置完整
-    await guardStartup()
+    // 启动守卫：非阻塞检查
+    guardResult = await guardStartup()
+
+    if (guardResult.needsSetup) {
+      logger.warn('⚠️  系统未完成配置，请访问 http://localhost:' + PORT + '/setup 完成初始化')
+    } else {
+      logger.info('✅ 启动守卫检查通过')
+    }
 
     // 启动前校验：数据库密码环境变量
     validateDatabaseEnv()
 
-    // 初始化数据库
-    logger.info('📦 初始化数据库...')
-    await initDatabase()
-    logger.info(`📦 当前存储模式: ${getStorageMode().toUpperCase()}`)
+    // 初始化数据库（在 guard 非阻塞后，如果配置完成才初始化）
+    if (guardResult.setupCompleted && guardResult.configValid) {
+      logger.info('📦 初始化数据库...')
+      await initDatabase()
+      logger.info(`📦 当前存储模式: ${getStorageMode().toUpperCase()}`)
 
-    // 初始化账号删除日志表
-    logger.info('📦 初始化账号删除日志表...')
-    const { createDeletionLogTable } = await import('./services/account-deletion-log.service')
-    await createDeletionLogTable()
+      // 初始化账号删除日志表
+      logger.info('📦 初始化账号删除日志表...')
+      const { createDeletionLogTable } = await import('./services/account-deletion-log.service')
+      await createDeletionLogTable()
+    } else {
+      logger.info('ℹ️  跳过数据库初始化（配置未完成）')
+    }
 
     // 初始化 WebSocket
     logger.info('🔌 初始化 WebSocket...')
@@ -240,35 +238,24 @@ async function start() {
       httpServer.once('error', reject)
       httpServer.listen(PORT, () => {
         httpServer.off('error', reject)
-      logger.info('='.repeat(60))
-      logger.info('✅ 服务器启动成功！')
-      logger.info('='.repeat(60))
-      logger.info(`📡 HTTP 服务: http://0.0.0.0:${PORT}`)
-      logger.info(`📊 管理面板: http://0.0.0.0:${PORT}`)
-      logger.info(`🔌 WebSocket: ws://0.0.0.0:${PORT}`)
-      logger.info(`🏥 健康检查: http://0.0.0.0:${PORT}/health`)
-      logger.info(`📈 监控指标: http://0.0.0.0:${PORT}/metrics`)
-      logger.info('='.repeat(60))
-      logger.info('📚 API 端点:')
-      logger.info(`   GET  /api/health-basic    - 基础健康检查`)
-      logger.info(`   GET  /api/health/refresh  - 刷新系统健康状态`)
-      logger.info(`   POST /api/tasks           - 创建任务`)
-      logger.info(`   GET  /api/tasks           - 获取任务列表`)
-      logger.info(`   GET  /api/tasks/stats     - 任务统计`)
-      logger.info(`   GET  /api/accounts        - 获取账号列表`)
-      logger.info(`   POST /api/accounts/export - 导出账号`)
-      logger.info(`   POST /api/accounts/:id/reset-error - 重置账号错误状态`)
-      logger.info(`   POST /api/accounts/reset-errors    - 批量重置错误状态`)
-      logger.info(`   GET  /api/refresh/logs    - 查询刷新日志`)
-      logger.info(`   GET  /api/refresh/logs/recent - 获取最近刷新日志`)
-      logger.info(`   GET  /api/refresh/logs/stats  - 刷新日志统计`)
-      logger.info(`   POST /api/generator       - 生成账号`)
-      logger.info('='.repeat(60))
-      logger.info('💡 提示:')
-      logger.info('   - 在浏览器中打开管理面板开始使用')
-      logger.info('   - 按 Ctrl+C 停止服务器')
-      logger.info('   - 查看 server/README.md 了解更多信息')
-      logger.info('')
+        logger.info('='.repeat(60))
+        logger.info('✅ 服务器启动成功！')
+        logger.info('='.repeat(60))
+        logger.info(`📡 HTTP 服务: http://0.0.0.0:${PORT}`)
+        logger.info(`📊 管理面板: http://0.0.0.0:${PORT}`)
+        logger.info(`🔌 WebSocket: ws://0.0.0.0:${PORT}`)
+        logger.info(`🏥 健康检查: http://0.0.0.0:${PORT}/health`)
+        logger.info(`📈 监控指标: http://0.0.0.0:${PORT}/metrics`)
+        if (guardResult && guardResult.needsSetup) {
+          logger.info(`🔧 配置向导: http://0.0.0.0:${PORT}/setup`)
+          logger.info('💡 提示: 系统尚未完成配置，请访问配置向导完成初始化')
+        }
+        logger.info('='.repeat(60))
+        logger.info('💡 提示:')
+        logger.info('   - 在浏览器中打开管理面板开始使用')
+        logger.info('   - 按 Ctrl+C 停止服务器')
+        logger.info('   - 查看 server/README.md 了解更多信息')
+        logger.info('')
         resolve()
       })
     })
@@ -282,18 +269,11 @@ async function start() {
 // 优雅关闭
 process.on('SIGINT', async () => {
   logger.info('正在关闭服务器...')
-
-  // 停止自动刷新调度器
   const { stopAutoRefreshScheduler } = await import('./services/auto-refresh-optimized.service')
   stopAutoRefreshScheduler()
-
-  // 停止邮箱检测调度器
   const { stopEmailDetectionScheduler } = await import('./services/email-detection.service')
   stopEmailDetectionScheduler()
-
-  // 清理数据库初始化状态
   cleanupInitState()
-
   await closeDatabase()
   httpServer.close(() => {
     logger.info('✅ 服务器已关闭')
@@ -303,18 +283,11 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
   logger.info('正在关闭服务器...')
-
-  // 停止自动刷新调度器
   const { stopAutoRefreshScheduler } = await import('./services/auto-refresh-optimized.service')
   stopAutoRefreshScheduler()
-
-  // 停止邮箱检测调度器
   const { stopEmailDetectionScheduler } = await import('./services/email-detection.service')
   stopEmailDetectionScheduler()
-
-  // 清理数据库初始化状态
   cleanupInitState()
-
   await closeDatabase()
   httpServer.close(() => {
     logger.info('✅ 服务器已关闭')

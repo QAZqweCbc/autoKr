@@ -1,7 +1,6 @@
-﻿/**
+/**
  * 启动守护服务
  * 在服务启动时验证必要的配置和数据库连接
- * 修改后：不再阻塞服务器启动，改为返回守护结果供主服务判断
  */
 
 import { existsSync, unlinkSync } from 'fs'
@@ -11,17 +10,16 @@ import { loadDatabaseConfig, DatabaseConfig } from './database-config.service'
 const SETUP_COMPLETE_FILE = path.join(process.cwd(), '.setup-completed')
 
 /**
- * 启动守护结果（不再抛错退出）
+ * 启动守护错误类
  */
-export interface StartupGuardResult {
-  setupCompleted: boolean
-  mysqlOk: boolean
-  mysqlError?: string
-  redisOk: boolean
-  redisError?: string
-  configValid: boolean
-  configError?: string
-  needsSetup: boolean
+export class StartupGuardError extends Error {
+  constructor(
+    message: string,
+    public code: 'SETUP_NOT_COMPLETED' | 'INVALID_CONFIG' | 'CONNECTION_FAILED'
+  ) {
+    super(message)
+    this.name = 'StartupGuardError'
+  }
 }
 
 /**
@@ -34,113 +32,59 @@ export interface ConnectionTestResult {
 }
 
 /**
- * 启动守护检查（非阻塞版本）
- * 不再抛错退出，而是返回结果对象供主服务判断
- * 如果配置未完成，仅返回 needsSetup=true，不阻止服务器启动
- * 如果数据库连接失败，仅记录警告，不删除 .setup-completed 标记
+ * 启动守护执行
+ * 检查配置完整性并验证数据库连接
+ * @throws {StartupGuardError} 如果检查失败
  */
-export async function guardStartup(): Promise<StartupGuardResult> {
+export async function guardStartup(): Promise<void> {
   console.log('\n🛡️  启动守护检查中...')
 
   // 1. 检查是否完成初始配置
-  const setupCompleted = isSetupCompleted()
-  if (!setupCompleted) {
-    console.log('⚠️  系统尚未完成初始配置，请在 /setup 页面完成配置')
-    return {
-      setupCompleted: false,
-      mysqlOk: false,
-      redisOk: false,
-      configValid: false,
-      needsSetup: true
-    }
+  if (!isSetupCompleted()) {
+    throw new StartupGuardError(
+      '系统尚未完成初始配置，请访问 /setup 页面完成配置',
+      'SETUP_NOT_COMPLETED'
+    )
   }
 
   console.log('✅ 配置完成标记已确认')
 
   // 2. 加载并验证数据库配置
-  let configValid = true
-  let configError: string | undefined
-  let config: DatabaseConfig | null = null
+  const config = loadDatabaseConfig()
+  validateDatabaseConfig(config)
 
+  console.log(`✅ 数据库配置验证通过 (${config.storage.toUpperCase()})`)
+
+  // 3. 测试数据库连接
   try {
-    config = loadDatabaseConfig()
-    validateDatabaseConfig(config)
-    console.log(`✅ 数据库配置验证通过 (${config.storage.toUpperCase()})`)
+    const result = await verifyDatabaseConnection(config)
+
+    if (!result.success) {
+      console.error('❌ 数据库连接测试失败:', result.error)
+
+      // 连接失败时清除配置标记，要求重新配置
+      clearSetupFlag()
+
+      throw new StartupGuardError(
+        `数据库连接失败: ${result.error}\n配置标记已清除，请重新配置`,
+        'CONNECTION_FAILED'
+      )
+    }
+
+    console.log(`✅ 数据库连接验证通过 (延迟: ${result.latency}ms)`)
   } catch (error: any) {
-    configValid = false
-    configError = error.message
-    console.warn('⚠️  数据库配置验证失败:', error.message)
-  }
-
-  // 3. 测试 MySQL 连接（非阻塞）
-  let mysqlOk = false
-  let mysqlError: string | undefined
-  let mysqlLatency: number | undefined
-
-  if (config && config.storage === 'mysql') {
-    try {
-      const result = await testMySQLConnection(config)
-      if (result.success) {
-        mysqlOk = true
-        mysqlLatency = result.latency
-        console.log(`✅ MySQL 连接验证通过 (延迟: ${result.latency}ms)`)
-      } else {
-        mysqlError = result.error
-        console.warn('⚠️  MySQL 连接测试失败:', result.error)
-      }
-    } catch (error: any) {
-      mysqlError = error.message || 'MySQL 连接测试异常'
-      console.warn('⚠️  MySQL 连接测试异常:', error.message)
+    // 如果不是 StartupGuardError，包装后重新抛出
+    if (!(error instanceof StartupGuardError)) {
+      clearSetupFlag()
+      throw new StartupGuardError(
+        `数据库连接测试异常: ${error.message}`,
+        'CONNECTION_FAILED'
+      )
     }
-  } else {
-    mysqlOk = true // 非 MySQL 模式
-    console.log('ℹ️  跳过 MySQL 连接测试（非 MySQL 存储模式）')
+    throw error
   }
 
-  // 4. 测试 Redis 连接（非阻塞，仅警告）
-  let redisOk = false
-  let redisError: string | undefined
-
-  if (config && config.storage !== 'redis') {
-    // Redis 作为缓存，可选
-    try {
-      const result = await testRedisConnection(config)
-      if (result.success) {
-        redisOk = true
-        console.log(`✅ Redis 连接验证通过`)
-      } else {
-        redisError = result.error
-        console.warn('⚠️  Redis 连接测试失败:', result.error)
-      }
-    } catch (error: any) {
-      redisError = error.message || 'Redis 连接测试异常'
-      console.warn('⚠️  Redis 连接测试异常:', error.message)
-    }
-  } else {
-    redisOk = true // Redis 作为主存储时已在上面测试
-    console.log('ℹ️  跳过 Redis 独立测试（Redis 为主存储模式）')
-  }
-
-  // 汇总结果
-  const needsSetup = !setupCompleted || !configValid
-  const allOk = setupCompleted && configValid && mysqlOk && redisOk
-
-  if (allOk) {
-    console.log('✅ 启动守护检查完成\n')
-  } else if (!needsSetup) {
-    console.log('⚠️  启动守护检查完成，部分连接不可用（不影响服务启动）\n')
-  }
-
-  return {
-    setupCompleted,
-    mysqlOk,
-    mysqlError,
-    redisOk,
-    redisError,
-    configValid,
-    configError,
-    needsSetup
-  }
+  console.log('✅ 启动守护检查完成\n')
 }
 
 /**
@@ -154,40 +98,89 @@ export function isSetupCompleted(): boolean {
 /**
  * 验证数据库配置的有效性
  * @param config 数据库配置
- * @throws 如果配置无效
+ * @throws {StartupGuardError} 如果配置无效
  */
 export function validateDatabaseConfig(config: DatabaseConfig): void {
   // 验证 MySQL 配置
   if (config.storage === 'mysql') {
     if (!config.mysql.host || config.mysql.host.trim() === '') {
-      throw new Error('MySQL 配置错误: 主机地址不能为空')
+      throw new StartupGuardError(
+        'MySQL 配置错误: 主机地址不能为空',
+        'INVALID_CONFIG'
+      )
     }
 
     if (!config.mysql.user || config.mysql.user.trim() === '') {
-      throw new Error('MySQL 配置错误: 用户名不能为空')
+      throw new StartupGuardError(
+        'MySQL 配置错误: 用户名不能为空',
+        'INVALID_CONFIG'
+      )
     }
 
     if (!config.mysql.database || config.mysql.database.trim() === '') {
-      throw new Error('MySQL 配置错误: 数据库名不能为空')
+      throw new StartupGuardError(
+        'MySQL 配置错误: 数据库名不能为空',
+        'INVALID_CONFIG'
+      )
     }
 
     if (config.mysql.port < 1 || config.mysql.port > 65535) {
-      throw new Error(`MySQL 配置错误: 端口号 ${config.mysql.port} 无效`)
+      throw new StartupGuardError(
+        `MySQL 配置错误: 端口号 ${config.mysql.port} 无效`,
+        'INVALID_CONFIG'
+      )
     }
   }
 
   // 验证 Redis 配置
   if (config.storage === 'redis') {
     if (!config.redis.host || config.redis.host.trim() === '') {
-      throw new Error('Redis 配置错误: 主机地址不能为空')
+      throw new StartupGuardError(
+        'Redis 配置错误: 主机地址不能为空',
+        'INVALID_CONFIG'
+      )
     }
 
     if (config.redis.port < 1 || config.redis.port > 65535) {
-      throw new Error(`Redis 配置错误: 端口号 ${config.redis.port} 无效`)
+      throw new StartupGuardError(
+        `Redis 配置错误: 端口号 ${config.redis.port} 无效`,
+        'INVALID_CONFIG'
+      )
     }
 
     if (config.redis.db < 0 || config.redis.db > 15) {
-      throw new Error(`Redis 配置错误: 数据库编号 ${config.redis.db} 无效 (0-15)`)
+      throw new StartupGuardError(
+        `Redis 配置错误: 数据库编号 ${config.redis.db} 无效 (0-15)`,
+        'INVALID_CONFIG'
+      )
+    }
+  }
+}
+
+/**
+ * 验证数据库连接
+ * 仅测试连接可用性，不执行初始化
+ * @param config 数据库配置
+ * @returns 连接测试结果
+ */
+export async function verifyDatabaseConnection(
+  config: DatabaseConfig
+): Promise<ConnectionTestResult> {
+  try {
+    if (config.storage === 'mysql') {
+      return await testMySQLConnection(config)
+    } else if (config.storage === 'redis') {
+      return await testRedisConnection(config)
+    } else {
+      return {
+        success: false,
+        error: '不支持的存储类型: ' + config.storage
+      }
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || '未知错误'
     }
   }
 }
@@ -208,7 +201,7 @@ async function testMySQLConnection(config: DatabaseConfig): Promise<ConnectionTe
       port: config.mysql.port,
       user: config.mysql.user,
       password: config.mysql.password,
-      connectTimeout: 5000
+      connectTimeout: 10000 // 10秒超时
     })
 
     // 执行 PING 测试
@@ -273,10 +266,10 @@ async function testRedisConnection(config: DatabaseConfig): Promise<ConnectionTe
       port: config.redis.port,
       password: config.redis.password || undefined,
       db: config.redis.db || 0,
-      connectTimeout: 5000,
-      maxRetriesPerRequest: 1,
-      retryStrategy: () => null,
-      lazyConnect: true
+      connectTimeout: 10000, // 10秒超时
+      maxRetriesPerRequest: 1, // 仅重试一次
+      retryStrategy: () => null, // 不自动重连
+      lazyConnect: true // 延迟连接，手动控制
     })
 
     // 建立连接
@@ -331,7 +324,6 @@ async function testRedisConnection(config: DatabaseConfig): Promise<ConnectionTe
 /**
  * 清除配置完成标记
  * 在数据库连接失败时调用，强制重新配置
- * （修改后：此函数不再被 guardStartup 自动调用）
  */
 export function clearSetupFlag(): void {
   try {
