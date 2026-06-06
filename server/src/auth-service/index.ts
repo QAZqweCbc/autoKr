@@ -131,7 +131,7 @@ async function start() {
     }
     
     // 启动HTTP服务器
-    app.listen(PORT, () => {
+    app.listen(Number(PORT), '0.0.0.0', () => {
       console.log('\n' + '='.repeat(60))
       console.log('✅ 注册认证服务启动成功！')
       console.log('='.repeat(60))

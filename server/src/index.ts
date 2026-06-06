@@ -201,8 +201,8 @@ async function start() {
       logger.info('✅ 启动守卫检查通过')
     }
 
-    // 启动前校验：数据库密码环境变量
-    validateDatabaseEnv()
+    // 启动前校验：数据库密码环境变量（非阻塞，仅警告）
+    try { validateDatabaseEnv(); } catch(e) { logger.warn('环境变量校验跳过（非阻塞模式）', e); }
 
     // 初始化数据库（在 guard 非阻塞后，如果配置完成才初始化）
     if (guardResult.setupCompleted && guardResult.configValid) {
@@ -236,7 +236,7 @@ async function start() {
     // 启动 HTTP 服务器
     await new Promise<void>((resolve, reject) => {
       httpServer.once('error', reject)
-      httpServer.listen(PORT, () => {
+      httpServer.listen(Number(PORT), '0.0.0.0', () => {
         httpServer.off('error', reject)
         logger.info('='.repeat(60))
         logger.info('✅ 服务器启动成功！')
