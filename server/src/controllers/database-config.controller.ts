@@ -135,6 +135,7 @@ export async function testDatabaseConnection(req: Request, res: Response) {
           port: config.port,
           user: config.user,
           password: config.password,
+          connectTimeout: 5000,
           waitForConnections: true,
           connectionLimit: 1,
           queueLimit: 0
@@ -172,25 +173,32 @@ export async function testDatabaseConnection(req: Request, res: Response) {
       }
     } else if (type === 'redis') {
       try {
-        const { initRedis, closeRedis } = await import('../services/redis.service')
-        
-        console.log('📦 Redis 服务已加载')
-        
-        await initRedis(config)
-        console.log('✅ Redis 连接已建立')
-        
-        await closeRedis()
-        console.log('✅ Redis 连接已关闭')
-        
+        const Redis = (await import('ioredis')).default
+
+        const redis = new Redis({
+          host: config.host,
+          port: config.port,
+          password: config.password || '',
+          db: config.db || 0,
+          connectTimeout: 5000,
+          maxRetriesPerRequest: 0,
+          retryStrategy: () => null,
+          lazyConnect: true
+        })
+
+        await redis.connect()
+        await redis.ping()
+        await redis.disconnect()
+
         res.json({
           success: true,
-          message: 'Redis 连接测试成功'
+          message: 'Redis ??????'
         })
       } catch (error: any) {
-        console.error('❌ Redis 连接错误:', error)
+        console.error('Redis ????:', error)
         res.status(500).json({
           success: false,
-          error: `Redis 连接失败: ${error.message}`
+          error: 'Redis ????: ' + error.message
         })
       }
     } else {
@@ -233,6 +241,7 @@ export async function testCurrentDatabaseConnection(req: Request, res: Response)
           port: config.mysql.port,
           user: config.mysql.user,
           password: config.mysql.password,
+          connectTimeout: 5000,
           waitForConnections: true,
           connectionLimit: 1,
           queueLimit: 0
@@ -270,26 +279,32 @@ export async function testCurrentDatabaseConnection(req: Request, res: Response)
       }
     } else if (type === 'redis') {
       try {
-        const { initRedis, closeRedis } = await import('../services/redis.service')
-        
-        console.log('📦 Redis 服务已加载')
-        console.log('🔐 使用配置文件中的密码')
-        
-        await initRedis(config.redis)
-        console.log('✅ Redis 连接已建立')
-        
-        await closeRedis()
-        console.log('✅ Redis 连接已关闭')
-        
+        const Redis = (await import('ioredis')).default
+
+        const redis = new Redis({
+          host: config.redis.host,
+          port: config.redis.port,
+          password: config.redis.password || '',
+          db: config.redis.db || 0,
+          connectTimeout: 5000,
+          maxRetriesPerRequest: 0,
+          retryStrategy: () => null,
+          lazyConnect: true
+        })
+
+        await redis.connect()
+        await redis.ping()
+        await redis.disconnect()
+
         res.json({
           success: true,
-          message: 'Redis 连接测试成功'
+          message: 'Redis ??????'
         })
       } catch (error: any) {
-        console.error('❌ Redis 连接错误:', error)
+        console.error('Redis ????:', error)
         res.status(500).json({
           success: false,
-          error: `Redis 连接失败: ${error.message}`
+          error: 'Redis ????: ' + error.message
         })
       }
     } else {
@@ -299,14 +314,14 @@ export async function testCurrentDatabaseConnection(req: Request, res: Response)
       })
     }
   } catch (error: any) {
-    console.error('❌ 连接测试失败:', error)
+    console.error('连接测试失败:', error)
     res.status(500).json({
       success: false,
       error: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     })
-  }
 }
+  }
 
 /**
  * 获取数据库状态
@@ -315,7 +330,7 @@ export function getDatabaseStatus(req: Request, res: Response) {
   try {
     const config = loadDatabaseConfig()
     const source = getConfigSource()
-    
+
     res.json({
       success: true,
       status: {
