@@ -228,6 +228,7 @@ export async function syncAccountUsage(
     
     // 资源详情
     resource_display_name?: string
+    resource_display_name_plural?: string
     resource_type?: string
     resource_currency?: string
     resource_unit?: string
@@ -305,6 +306,7 @@ export async function syncAccountUsage(
         
         // 资源详情
         resource_display_name: usageBreakdown?.displayName,
+        resource_display_name_plural: usageBreakdown?.displayNamePlural,
         resource_type: usageBreakdown?.resourceType,
         resource_currency: usageBreakdown?.currency,
         resource_unit: usageBreakdown?.unit,

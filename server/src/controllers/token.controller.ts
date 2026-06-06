@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Token 控制器 - 处理 SSO Token 提交和账号分发
  */
 
@@ -132,6 +132,21 @@ export async function submitToken(req: Request, res: Response) {
 
     console.log(`✅ 支持自动刷新: 是`)
     console.log('='.repeat(60))
+
+    // 同步账号使用量数据
+    const { syncAccountUsage } = await import('../services/kiro-api.service')
+    let usageInfo = undefined
+    try {
+      usageInfo = await syncAccountUsage(ssoResult.accessToken, 'BuilderId')
+      if (usageInfo.success && usageInfo.data) {
+        await AccountDB.updateExtendedInfo(account.id, usageInfo.data)
+        console.log('✅ 使用量数据同步成功')
+      } else {
+        console.warn("⚠️ 使用量数据同步失败: " + (usageInfo.error || "未知错误"))
+      }
+    } catch (syncError: any) {
+      console.warn("⚠️ 使用量数据同步异常: " + syncError.message)
+    }
 
     res.json({
       success: true,

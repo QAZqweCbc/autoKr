@@ -8,6 +8,7 @@ import {
   getAccountById,
   deleteAccount,
   exportAccounts,
+  exportTokens,
   getAccountStats,
   getDomainStats,
   getDailyStats,
@@ -28,6 +29,7 @@ router.get('/stats/daily', getDailyStats)
 router.get('/:id', getAccountById)
 router.post('/:id/reset-error', resetAccountError)
 router.post('/export', exportAccounts)
+router.post('/export-tokens', exportTokens)
 router.post('/reset-errors', resetAccountErrors)
 router.delete('/:id', deleteAccount)
 

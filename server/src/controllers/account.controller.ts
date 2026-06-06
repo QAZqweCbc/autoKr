@@ -12,7 +12,7 @@ import { exportAccountsAsJSON, exportAccountsAsCSV } from '../services/generator
 export async function getAccounts(req: Request, res: Response) {
   try {
     const accounts = await AccountDB.getAll()
-    
+
     // 将嵌套结构转换为扁平结构（兼容前端）
     const flatAccounts = accounts.map(acc => ({
       id: acc.id,
@@ -20,7 +20,7 @@ export async function getAccounts(req: Request, res: Response) {
       password: acc.password,
       nickname: acc.nickname,
       status: acc.status,
-      
+
       // credentials 扁平化
       access_token: acc.credentials.accessToken,
       csrf_token: acc.credentials.csrfToken,
@@ -32,7 +32,7 @@ export async function getAccounts(req: Request, res: Response) {
       expires_at: acc.credentials.expiresAt,
       auth_method: acc.credentials.authMethod,
       provider: acc.credentials.provider,
-      
+
       // subscription 扁平化
       subscription_type: acc.subscription.type,
       subscription_title: acc.subscription.title,
@@ -42,7 +42,7 @@ export async function getAccounts(req: Request, res: Response) {
       upgrade_capability: acc.subscription.upgradeCapability,
       overage_capability: acc.subscription.overageCapability,
       management_target: acc.subscription.managementTarget,
-      
+
       // usage 扁平化
       usage_current: acc.usage.current,
       usage_limit: acc.usage.limit,
@@ -55,7 +55,7 @@ export async function getAccounts(req: Request, res: Response) {
       free_trial_expiry: acc.usage.freeTrialExpiry,
       usage_bonuses: acc.usage.bonuses,
       next_reset_date: acc.usage.nextResetDate,
-      
+
       // resourceDetail 扁平化
       resource_type: acc.usage.resourceDetail?.resourceType,
       resource_display_name: acc.usage.resourceDetail?.displayName,
@@ -65,7 +65,7 @@ export async function getAccounts(req: Request, res: Response) {
       overage_rate: acc.usage.resourceDetail?.overageRate,
       overage_cap: acc.usage.resourceDetail?.overageCap,
       overage_enabled: acc.usage.resourceDetail?.overageEnabled,
-      
+
       // 其他字段
       idp: acc.idp,
       user_id: acc.userId,
@@ -82,7 +82,7 @@ export async function getAccounts(req: Request, res: Response) {
       last_used_at: acc.lastUsedAt,
       last_checked_at: acc.lastCheckedAt
     }))
-    
+
     res.json({
       success: true,
       accounts: flatAccounts,
@@ -104,14 +104,14 @@ export async function getAccountById(req: Request, res: Response) {
   try {
     const { id } = req.params
     const account = await AccountDB.getById(id as string)
-    
+
     if (!account) {
       return res.status(404).json({
         success: false,
         error: '账号不存在'
       })
     }
-    
+
     // 转换为扁平结构
     const flatAccount = {
       id: account.id,
@@ -168,7 +168,7 @@ export async function getAccountById(req: Request, res: Response) {
       last_used_at: account.lastUsedAt,
       last_checked_at: account.lastCheckedAt
     }
-    
+
     res.json({
       success: true,
       account: flatAccount
@@ -189,7 +189,7 @@ export async function deleteAccount(req: Request, res: Response) {
   try {
     const { id } = req.params
     await AccountDB.delete(id as string)
-    
+
     res.json({
       success: true,
       message: '账号已删除'
@@ -210,7 +210,7 @@ export async function exportAccounts(req: Request, res: Response) {
   try {
     const { format = 'json' } = req.body
     const accounts = await AccountDB.getAll()
-    
+
     if (format === 'csv') {
       const csv = exportAccountsAsCSV(accounts)
       res.setHeader('Content-Type', 'text/csv')
@@ -232,12 +232,73 @@ export async function exportAccounts(req: Request, res: Response) {
 }
 
 /**
+ * 导出 Token（支持多种格式）
+ */
+export async function exportTokens(req: Request, res: Response) {
+  try {
+    const {
+      accountIds,
+      format = 'json',
+      fields,
+      onlyWithToken = true,
+      includeExpired = false
+    } = req.body
+
+    // 获取要导出的账号
+    let accounts: any[]
+    if (accountIds && Array.isArray(accountIds) && accountIds.length > 0) {
+      // 导出指定账号
+      accounts = await Promise.all(
+        accountIds.map((id: string) => AccountDB.getById(id))
+      )
+      accounts = accounts.filter(Boolean) // 过滤掉不存在的账号
+    } else {
+      // 导出所有账号
+      accounts = await AccountDB.getAll()
+    }
+
+    if (accounts.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: '没有可导出的账号'
+      })
+    }
+
+    const { exportTokens: doExport, generateExportFilename } =
+      await import('../services/token-export.service')
+
+    const exportData = doExport(accounts, {
+      format: format === 'aiclient2api' ? 'aiclient2api' : 'json',
+      fields,
+      onlyWithToken,
+      includeExpired
+    })
+
+    const filename = generateExportFilename(
+      format === 'aiclient2api' ? 'aiclient2api' : 'json',
+      accounts.length
+    )
+
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.send(exportData)
+
+  } catch (error: any) {
+    console.error('导出 Token 失败:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+}
+
+/**
  * 获取账号统计
  */
 export async function getAccountStats(req: Request, res: Response) {
   try {
     const stats = await AccountDB.getStats()
-    
+
     res.json({
       success: true,
       stats
@@ -257,7 +318,7 @@ export async function getAccountStats(req: Request, res: Response) {
 export async function getDomainStats(req: Request, res: Response) {
   try {
     const stats = await AccountDB.getDomainStats()
-    
+
     res.json({
       success: true,
       stats
@@ -278,7 +339,7 @@ export async function getDailyStats(req: Request, res: Response) {
   try {
     const days = parseInt(req.query.days as string) || 7
     const stats = await AccountDB.getDailyStats(days)
-    
+
     res.json({
       success: true,
       stats
@@ -299,16 +360,16 @@ export async function resetAccountError(req: Request, res: Response) {
   try {
     const { id } = req.params
     const { resetAccountError } = await import('../services/auto-refresh-optimized.service')
-    
+
     const success = await resetAccountError(id)
-    
+
     if (!success) {
       return res.status(404).json({
         success: false,
         error: '账号不存在'
       })
     }
-    
+
     res.json({
       success: true,
       message: '错误状态已重置'
@@ -328,17 +389,17 @@ export async function resetAccountError(req: Request, res: Response) {
 export async function resetAccountErrors(req: Request, res: Response) {
   try {
     const { accountIds } = req.body
-    
+
     if (!Array.isArray(accountIds) || accountIds.length === 0) {
       return res.status(400).json({
         success: false,
         error: '请提供账号ID数组'
       })
     }
-    
+
     const { resetAccountErrors } = await import('../services/auto-refresh-optimized.service')
     const count = await resetAccountErrors(accountIds)
-    
+
     res.json({
       success: true,
       count,

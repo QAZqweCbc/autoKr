@@ -2,9 +2,17 @@
   <div class="token-view">
     <el-card>
       <template #header>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="dispalign-items: center;">
           <span style="font-weight: 600;">Token 管理</span>
           <div style="display: flex; gap: 12px;">
+            <el-button
+              type="success"
+              :icon="Download"
+              :disabled="selectedAccountIds.size === 0"
+              @click="showExportDialog"
+            >
+              导出 Token ({{ selectedAccountIds.size }})
+            </el-button>
             <el-button type="primary" :icon="Refresh" :loading="refreshingAll" @click="handleRefreshAll">
               批量刷新
             </el-button>
@@ -258,11 +266,34 @@
 
       <!-- 账号列表 -->
       <el-divider />
-      <div style="margin-bottom: 16px;">
+      <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
         <span style="font-weight: 600; font-size: 16px;">所有账号 ({{ accounts.length }})</span>
+        <div style="display: flex; gap: 12px; align-items: center;">
+          <el-button
+            v-if="selectedAccountIds.size > 0"
+            size="small"
+            @click="clearSelection"
+          >
+            取消选择
+          </el-button>
+          <el-button
+            size="small"
+            type="primary"
+            @click="selectAll"
+          >
+            全选 ({{ accounts.length }})
+          </el-button>
+        </div>
       </div>
-      
-      <el-table :data="accounts" stripe style="width: 100%;">
+
+      <el-table
+        ref="tableRef"
+        :data="accounts"
+        stripe
+        style="width: 100%;"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" />
         <el-table-column prop="email" label="邮箱" min-width="180" />
         <el-table-column label="订阅" width="140">
           <template #default="{ row }">
@@ -369,15 +400,22 @@
         </template>
       </el-alert>
     </el-card>
+
+    <!-- Token 导出对话框 -->
+    <TokenExportDialog
+      v-model="showExport"
+      :selected-account-ids="Array.from(selectedAccountIds)"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, CopyDocument } from '@element-plus/icons-vue'
+import { Refresh, CopyDocument, Download } from '@element-plus/icons-vue'
 import { getAccounts } from '../api/accounts'
 import axios from 'axios'
+import TokenExportDialog from '../components/TokenExportDialog.vue'
 
 // Using Account type from API
 import type { Account } from '../api/accounts'
@@ -391,6 +429,11 @@ const refreshingAll = ref(false)
 const refreshingIds = ref(new Set<string>())
 const syncingAll = ref(false)
 const syncingIds = ref(new Set<string>())
+
+// 导出功能相关
+const selectedAccountIds = ref(new Set<string>())
+const showExport = ref(false)
+const tableRef = ref<any>(null)
 
 // 计算可自动刷新的账号数量
 const refreshableCount = computed(() => {
@@ -718,6 +761,35 @@ const calculatePercent = (current: number | undefined, limit: number | undefined
 const formatDate = (dateStr: string | number | undefined) => {
   if (!dateStr) return '-'
   return new Date(dateStr).toLocaleString('zh-CN')
+}
+
+// 表格选择处理
+const handleSelectionChange = (selection: Account[]) => {
+  selectedAccountIds.value = new Set(selection.map(acc => acc.id))
+}
+
+// 全选
+const selectAll = () => {
+  selectedAccountIds.value = new Set(accounts.value.map(acc => acc.id))
+  // 触发表格的全选
+  accounts.value.forEach(row => {
+    tableRef.value?.toggleRowSelection(row, true)
+  })
+}
+
+// 清除选择
+const clearSelection = () => {
+  selectedAccountIds.value.clear()
+  tableRef.value?.clearSelection()
+}
+
+// 显示导出对话框
+const showExportDialog = () => {
+  if (selectedAccountIds.value.size === 0) {
+    ElMessage.warning('请先选择要导出的账号')
+    return
+  }
+  showExport.value = true
 }
 </script>
 
