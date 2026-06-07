@@ -5,6 +5,7 @@
 
 import 'dotenv/config'
 import express, { Request, Response } from 'express'
+import { existsSync } from 'fs'
 import cors from 'cors'
 import { Server as SocketIOServer } from 'socket.io'
 import { createServer } from 'http'
@@ -202,7 +203,10 @@ async function start() {
     }
 
     // 启动前校验：数据库密码环境变量（非阻塞，仅警告）
-    try { validateDatabaseEnv(); } catch(e) { logger.warn('环境变量校验跳过（非阻塞模式）', e); }
+    const envResult = validateDatabaseEnv()
+    if (!envResult.success) {
+      logger.warn('⚠️  部分数据库环境变量未设置，服务继续运行但功能可能受限')
+    }
 
     // 初始化数据库（在 guard 非阻塞后，如果配置完成才初始化）
     if (guardResult.setupCompleted && guardResult.configValid) {
