@@ -317,34 +317,68 @@ async function start() {
   }
 }
 
+// ============================================
 // 优雅关闭
-process.on('SIGINT', async () => {
-  logger.info('正在关闭服务器...')
-  const { stopAutoRefreshScheduler } = await import('./services/auto-refresh-optimized.service')
-  stopAutoRefreshScheduler()
-  const { stopEmailDetectionScheduler } = await import('./services/email-detection.service')
-  stopEmailDetectionScheduler()
-  cleanupInitState()
-  await closeDatabase()
-  httpServer.close(() => {
-    logger.info('✅ 服务器已关闭')
-    process.exit(0)
-  })
-})
+// ============================================
+let isShuttingDown = false
 
-process.on('SIGTERM', async () => {
+async function gracefulShutdown() {
+  if (isShuttingDown) return
+  isShuttingDown = true
   logger.info('正在关闭服务器...')
-  const { stopAutoRefreshScheduler } = await import('./services/auto-refresh-optimized.service')
-  stopAutoRefreshScheduler()
-  const { stopEmailDetectionScheduler } = await import('./services/email-detection.service')
-  stopEmailDetectionScheduler()
+
+  // 1. 停止调度器
+  try {
+    const { stopAutoRefreshScheduler } = await import('./services/auto-refresh-optimized.service')
+    stopAutoRefreshScheduler()
+  } catch { /* ignore */ }
+
+  try {
+    const { stopEmailDetectionScheduler } = await import('./services/email-detection.service')
+    stopEmailDetectionScheduler()
+  } catch { /* ignore */ }
+
+  // 2. 清理 WebSocket 客户端连接
+  try {
+    const allRooms = (io as any).adapter?.store?.rooms
+    if (allRooms) {
+      for (const [roomId, sids] of (allRooms as Map<string, Set<string>>).entries()) {
+        if (roomId !== 'global' && roomId !== 'undefined') {
+          // 断开单个客户端房间
+          for (const sid of sids) {
+            const socket = io.sockets.sockets.get(sid)
+            if (socket) {
+              socket.disconnect(true)
+            }
+          }
+        }
+      }
+    }
+  } catch { /* ignore */ }
+
+  // 3. 清理初始化状态
   cleanupInitState()
-  await closeDatabase()
+
+  // 4. 关闭数据库
+  try {
+    await closeDatabase()
+  } catch { /* ignore */ }
+
+  // 5. 关闭 HTTP 服务器（强制超时 5 秒）
   httpServer.close(() => {
     logger.info('✅ 服务器已关闭')
     process.exit(0)
   })
-})
+
+  // 强制退出：如果 5 秒内还没关完，直接退出
+  setTimeout(() => {
+    logger.warn('⚠️  强制关闭超时，直接退出')
+    process.exit(0)
+  }, 5000)
+}
+
+process.on('SIGINT', gracefulShutdown)
+process.on('SIGTERM', gracefulShutdown)
 
 // 启动
 start()

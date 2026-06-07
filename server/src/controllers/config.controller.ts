@@ -255,12 +255,21 @@ export async function testEmailConnection(req: Request, res: Response) {
     })
   } catch (error: any) {
     console.error('测试邮箱连接失败:', error)
-    
+
     // 提供详细的错误提示
     let errorMessage = error.message
     let suggestions: string[] = []
-    
-    if (error.message.includes('AUTHENTICATIONFAILED')) {
+
+    if (error.message.includes('Login fail') || error.message.includes('Account is abnormal')) {
+      errorMessage = 'QQ 邮箱登录失败'
+      suggestions = [
+        '确认已在 QQ 邮箱网页版开启 IMAP/SMTP 服务',
+        '使用授权码而不是 QQ 邮箱密码（设置→账户→生成授权码）',
+        '检查授权码是否正确（16位字符）',
+        '如果频繁尝试，请等待 10-30 分钟后再试',
+        '尝试在 QQ 邮箱网页版登录一次解除限制'
+      ]
+    } else if (error.message.includes('AUTHENTICATIONFAILED')) {
       errorMessage = '授权码验证失败'
       suggestions = [
         '检查授权码是否正确（不是 QQ 密码）',
@@ -281,8 +290,8 @@ export async function testEmailConnection(req: Request, res: Response) {
         '尝试更换 DNS 服务器'
       ]
     }
-    
-    res.status(500).json({
+
+    res.status(400).json({
       success: false,
       error: errorMessage,
       suggestions: suggestions,

@@ -96,9 +96,30 @@ function patchPlaywrightScreenshotPath(autoRegisterPath: string) {
     return
   }
 
-  const playwrightPath = require.resolve('playwright', {
-    paths: [path.dirname(autoRegisterPath)]
-  })
+  let playwrightPath: string | null = null
+
+  // 优先从项目根目录查找 playwright（server/node_modules/playwright 或主项目 node_modules）
+  const searchDirs = [
+    path.dirname(autoRegisterPath),
+    path.resolve(__dirname, '../..'),  // server 目录
+    path.resolve(__dirname, '../../..') // 项目根目录
+  ]
+
+  for (const dir of searchDirs) {
+    try {
+      playwrightPath = require.resolve('playwright', { paths: [dir] })
+      break
+    } catch {
+      // 此目录下找不到，继续尝试下一个
+    }
+  }
+
+  if (!playwrightPath) {
+    // playwright 不存在，跳过截图 patch（不影响其他功能）
+    console.log('⚠️  playwright 未安装，跳过调试截图 patch')
+    return
+  }
+
   const playwright = require(playwrightPath)
 
   patchBrowserType(playwright.chromium)
@@ -143,16 +164,32 @@ export async function getAutoRegisterAWS() {
   try {
     console.log(`📦 加载路径: ${autoRegisterPath}`)
     patchPlaywrightScreenshotPath(autoRegisterPath)
-    
+
     // 使用 require 动态加载（运行时解析）
     const autoRegisterModule = require(autoRegisterPath)
-    
+
     if (!autoRegisterModule || !autoRegisterModule.autoRegisterAWS) {
       throw new Error('autoRegisterAWS 函数未找到')
     }
-    
+
     return autoRegisterModule.autoRegisterAWS
   } catch (error: any) {
+    // 判断是否为 playwright 缺失
+    const isPlaywrightMissing = error.code === 'MODULE_NOT_FOUND' &&
+      (error.message.includes('playwright') || error.requireStack?.some((s: string) => s.includes('playwright')))
+
+    if (isPlaywrightMissing) {
+      console.error('\n' + '='.repeat(60))
+      console.error('❌ playwright 未安装，无法执行自动注册任务')
+      console.error('='.repeat(60))
+      console.error('请在服务器上执行以下命令安装：')
+      console.error('  cd /root/桌面/autoKr')
+      console.error('  npm install')
+      console.error('  npx playwright install chromium')
+      console.error('='.repeat(60) + '\n')
+      throw new Error('playwright 未安装，无法执行自动注册任务。请执行: npm install && npx playwright install chromium')
+    }
+
     console.error('\n' + '='.repeat(60))
     console.error('❌ 加载 autoRegister 模块失败')
     console.error('='.repeat(60))

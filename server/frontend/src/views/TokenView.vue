@@ -359,7 +359,7 @@
                 v-if="canAutoRefresh(row)"
                 type="success"
                 size="small"
-      Refresh"
+                :icon="Refresh"
                 :loading="refreshingIds.has(row.id)"
                 @click="refreshAccountQuota(row)"
               >
@@ -418,7 +418,6 @@ const selectedAccount = ref<Account | null>(null)
 const refreshingAll = ref(false)
 const refreshingIds = ref(new Set<string>())
 const syncingAll = ref(false)
-const syncingIds = ref(new Set<string>())
 
 // 导出功能相关
 const selectedAccountIds = ref(new Set<string>())

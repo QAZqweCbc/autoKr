@@ -24,6 +24,7 @@ Thumbs.db
 *.swp
 *.swo
 .kiro/
+*.patch
 
 # Lock files (optional, 根据团队需求决定)
 # package-lock.json
