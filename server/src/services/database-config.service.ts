@@ -171,13 +171,27 @@ export function loadDatabaseConfig(): DatabaseConfig {
   const rawStorage = envConfig.storage || fileConfig.storage || DEFAULT_CONFIG.storage
   const storage: 'mysql' | 'redis' = ['mysql', 'redis'].includes(rawStorage) ? rawStorage : DEFAULT_CONFIG.storage
 
+  // 按优先级合并 MySQL 配置：默认值 < JSON文件 < 环境变量(仅当变量非空时覆盖)
+  // 关键：只有环境变量明确设置了值时才覆盖 JSON 中的配置
+  // 如果 JSON 中有值但环境变量为空，应以 JSON 为准（Setup Wizard 配置优先）
+  const mysqlConfig: DatabaseConfig['mysql'] = {
+    ...DEFAULT_CONFIG.mysql,
+    ...(fileConfig.mysql && {
+      ...fileConfig.mysql,
+      ...(envConfig.mysql && {
+        // 仅当环境变量中的字段有值时才覆盖
+        ...(envConfig.mysql.host && { host: envConfig.mysql.host }),
+        ...(envConfig.mysql.port && { port: envConfig.mysql.port }),
+        ...(envConfig.mysql.user && { user: envConfig.mysql.user }),
+        ...(envConfig.mysql.password && { password: envConfig.mysql.password }),
+        ...(envConfig.mysql.database && { database: envConfig.mysql.database })
+      })
+    })
+  }
+
   const config: DatabaseConfig = {
     storage,
-    mysql: {
-      ...DEFAULT_CONFIG.mysql,
-      ...fileConfig.mysql,
-      ...envConfig.mysql
-    },
+    mysql: mysqlConfig,
     redis: redisConfig
   }
 
