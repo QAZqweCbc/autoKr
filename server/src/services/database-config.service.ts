@@ -152,7 +152,6 @@ export function loadDatabaseConfig(): DatabaseConfig {
   }
 
   // 加载配置（按优先级合并）
-  const envConfig = loadFromEnv()
   const fileConfig = loadFromFile()
 
 
@@ -168,34 +167,24 @@ export function loadDatabaseConfig(): DatabaseConfig {
   }
 
   // 验证 storage 类型，必须是 'mysql' 或 'redis'，否则 fallback 到默认值
-  const rawStorage = envConfig.storage || fileConfig.storage || DEFAULT_CONFIG.storage
-  const storage: 'mysql' | 'redis' = ['mysql', 'redis'].includes(rawStorage) ? rawStorage : DEFAULT_CONFIG.storage
+  const rawStorage: string = process.env.DATABASE_STORAGE || fileConfig.storage || DEFAULT_CONFIG.storage
+  const storage: 'mysql' | 'redis' = (['mysql', 'redis'].includes(rawStorage) ? rawStorage : 'mysql') as 'mysql' | 'redis'
 
   // 按优先级合并 MySQL 配置：默认值 < JSON文件 < 环境变量(仅当变量非空时覆盖)
   // 关键：只有环境变量明确设置了值时才覆盖 JSON 中的配置
-  // 如果 JSON 中有值但环境变量为空，应以 JSON 为准（Setup Wizard 配置优先）
   const mysqlConfig: DatabaseConfig['mysql'] = {
     ...DEFAULT_CONFIG.mysql,
     ...(fileConfig.mysql && {
       ...fileConfig.mysql,
-      ...(envConfig.mysql && {
-        // 仅当环境变量中的字段有值时才覆盖
-        ...(envConfig.mysql.host && { host: envConfig.mysql.host }),
-        ...(envConfig.mysql.port && { port: envConfig.mysql.port }),
-        ...(envConfig.mysql.user && { user: envConfig.mysql.user }),
-        ...(envConfig.mysql.password && { password: envConfig.mysql.password }),
-        ...(envConfig.mysql.database && { database: envConfig.mysql.database })
-      })
+      // 仅当环境变量中对应的字段有值时才覆盖（不 fallback 到默认值）
+      ...(process.env.MYSQL_HOST && { host: process.env.MYSQL_HOST }),
+      ...(process.env.MYSQL_PORT && { port: parseInt(process.env.MYSQL_PORT) }),
+      ...(process.env.MYSQL_USER && { user: process.env.MYSQL_USER }),
+      ...(process.env.MYSQL_PASSWORD && { password: process.env.MYSQL_PASSWORD }),
+      ...(process.env.DB_PASSWORD && { password: process.env.DB_PASSWORD }),
+      ...(process.env.MYSQL_DATABASE && { database: process.env.MYSQL_DATABASE })
     })
   }
-
-  // 调试日志：输出最终合并结果
-  console.log('🔍 [Debug] loadDatabaseConfig:', {
-    storage,
-    env: envConfig.mysql ? { host: envConfig.mysql.host, port: envConfig.mysql.port, user: envConfig.mysql.user, hasPassword: !!envConfig.mysql.password } : 'empty',
-    file: fileConfig.mysql ? { host: fileConfig.mysql.host, port: fileConfig.mysql.port, user: fileConfig.mysql.user, hasPassword: !!fileConfig.mysql.password } : 'empty',
-    merged: mysqlConfig
-  })
 
   const config: DatabaseConfig = {
     storage,
