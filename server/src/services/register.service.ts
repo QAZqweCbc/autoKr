@@ -135,15 +135,24 @@ async function executeTask(task: Task) {
     }
     
     // 调试：检查授权码是否被正确解密
-    const authCodePreview = emailConfig.authCode.substring(0, 4) + '****'
+    const authCodePreview = emailConfig.authCode ? emailConfig.authCode.substring(0, 4) + '****' : '(空)'
     log(`✅ 邮箱配置加载成功: ${emailConfig.qqEmail}`)
-    log(`📝 授权码预览: ${authCodePreview} (长度: ${emailConfig.authCode.length})`)
-    
-    // 检查是否是脱敏数据
-    if (emailConfig.authCode === '******' || emailConfig.authCode.includes('*')) {
-      throw new Error('❌ 授权码未正确解密，请检查存储配置')
+    log(`📝 授权码预览: ${authCodePreview} (长度: ${emailConfig.authCode?.length || 0})`)
+
+    // 检查授权码是否可用
+    if (!emailConfig.authCode || emailConfig.authCode === '******' || emailConfig.authCode.includes('*') || emailConfig.authCode.trim() === '') {
+      throw new Error(
+        '❌ 邮箱授权码不可用\n' +
+        '可能原因：\n' +
+        '1. 授权码解密失败（密钥不匹配）\n' +
+        '2. 授权码未配置\n' +
+        '\n' +
+        '解决方法：\n' +
+        '- 请在管理页面重新配置邮箱授权码\n' +
+        '- 或确保所有设备使用相同的 ENCRYPTION_KEY'
+      )
     }
-    
+
     // 使用配置中的授权码，而不是任务表中的
     const authCode = emailConfig.authCode
     const receiveEmail = task.receive_email || emailConfig.qqEmail

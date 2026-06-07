@@ -90,7 +90,10 @@ export function encrypt(text: string): string {
 /**
  * 解密文本
  * @param encryptedText 加密的字符串（格式：iv:authTag:encryptedData）
- * @returns 解密后的明文
+ * @returns 解密后的明文，解密失败返回空字符串
+ *
+ * 注意：解密失败不会抛异常，而是返回空字符串并记录警告
+ * 这样可以避免因密钥不匹配导致服务崩溃
  */
 export function decrypt(encryptedText: string): string {
   if (!encryptedText) return ''
@@ -101,7 +104,8 @@ export function decrypt(encryptedText: string): string {
     // 解析加密数据
     const parts = encryptedText.split(':')
     if (parts.length !== 3) {
-      throw new Error('加密数据格式错误')
+      console.warn('⚠️  加密数据格式错误，返回空字符串')
+      return ''
     }
     
     const iv = Buffer.from(parts[0], 'hex')
@@ -116,8 +120,9 @@ export function decrypt(encryptedText: string): string {
     
     return decrypted
   } catch (error: any) {
-    console.error('❌ 解密失败:', error.message)
-    throw new Error('解密失败')
+    console.warn('⚠️  解密失败（可能是密钥不匹配）:', error.message)
+    console.warn('💡 提示: 如果数据是在其他设备上加密的，请确保 ENCRYPTION_KEY 一致')
+    return ''  // 降级处理：返回空字符串而不是抛异常
   }
 }
 
