@@ -133,14 +133,14 @@ function patchPlaywrightScreenshotPath(autoRegisterPath: string) {
 
 // 运行时动态导入，避免 TypeScript 编译时检查
 export async function getAutoRegisterAWS() {
-  // server 目录是 __dirname（当前文件在 server/src/services/）
-  const serverDir = path.resolve(__dirname, '..')
+  // __dirname = server/src/services/
+  // 所以 serverDir = server/src/, projectRoot = server/../(项目根目录)
+  const serverDir = path.resolve(__dirname, '..')       // server/src/
+  const projectRoot = path.resolve(serverDir, '..')     // server/ 的父级 = 项目根目录
 
-  // 从 server 目录创建 require，这样 require('playwright') 能正确解析到 server/node_modules
-  const serverRequire = createRequire(path.join(serverDir, 'package.json'))
-
-  // 项目根目录是 server 的父级
-  const projectRoot = path.resolve(serverDir, '..')
+  // 从 server 目录创建 require（server 目录有 package.json 和 node_modules）
+  const serverPkgPath = path.resolve(serverDir, '../package.json')  // server/package.json
+  const serverRequire = createRequire(serverPkgPath)
 
   // 查找 out/main 目录中的 autoRegister 文件（可能带 hash）
   const outMainDir = path.join(projectRoot, 'out/main')
