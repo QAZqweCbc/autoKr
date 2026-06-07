@@ -87,14 +87,43 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim(
   'http://localhost:1455',
   'http://localhost:5173',  // Vite dev server
   'http://127.0.0.1:1455',
-  'http://127.0.0.1:5173'
+  'http://127.0.0.1:5173',
+  'http://0.0.0.0:1455',
+  'http://0.0.0.0:5173',
+  'http://0.0.0.0:3000'
 ]
 
 logger.info('🔒 CORS 允许的来源:', ALLOWED_ORIGINS)
 
+/**
+ * 检查 Origin 是否为本地地址
+ * 支持 localhost、127.0.0.1、0.0.0.0 以及内网 IP（192.168.x.x、10.x.x.x、172.16-31.x.x）
+ */
+function isLocalOrigin(origin: string | undefined): boolean {
+  if (!origin) return false
+  try {
+    const url = new URL(origin)
+    const hostname = url.hostname
+    // localhost / 127.0.0.1
+    if (/^localhost$|^127\.0\.0\.1$|^0\.0\.0\.0$/.test(hostname)) return true
+    // 内网 IP 范围
+    if (/^192\.168\./.test(hostname)) return true
+    if (/^10\./.test(hostname)) return true
+    if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)) return true
+    return false
+  } catch {
+    return false
+  }
+}
+
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: ALLOWED_ORIGINS,
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true)
+      if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true)
+      if (isLocalOrigin(origin)) return callback(null, true)
+      callback(null, false)
+    },
     methods: ['GET', 'POST'],
     credentials: true
   },
@@ -110,6 +139,9 @@ app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true)
     if (ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true)
+    } else if (isLocalOrigin(origin)) {
+      // 本地/内网 IP 自动放行
       callback(null, true)
     } else {
       logger.warn('CORS blocked origin:', origin)
