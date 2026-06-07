@@ -189,6 +189,14 @@ export function loadDatabaseConfig(): DatabaseConfig {
     })
   }
 
+  // 调试日志：输出最终合并结果
+  console.log('🔍 [Debug] loadDatabaseConfig:', {
+    storage,
+    env: envConfig.mysql ? { host: envConfig.mysql.host, port: envConfig.mysql.port, user: envConfig.mysql.user, hasPassword: !!envConfig.mysql.password } : 'empty',
+    file: fileConfig.mysql ? { host: fileConfig.mysql.host, port: fileConfig.mysql.port, user: fileConfig.mysql.user, hasPassword: !!fileConfig.mysql.password } : 'empty',
+    merged: mysqlConfig
+  })
+
   const config: DatabaseConfig = {
     storage,
     mysql: mysqlConfig,
