@@ -5,6 +5,7 @@
 
 import * as path from 'path'
 import * as fs from 'fs'
+import { createRequire } from 'module'
 
 const DEBUG_IMAGE_DIR = path.resolve(__dirname, '../../logs/img')
 let screenshotPatchApplied = false
@@ -132,20 +133,24 @@ function patchPlaywrightScreenshotPath(autoRegisterPath: string) {
 
 // 运行时动态导入，避免 TypeScript 编译时检查
 export async function getAutoRegisterAWS() {
-  // 计算绝对路径：从项目根目录加载
-  const projectRoot = path.resolve(__dirname, '../../..')
-  
+  // server 目录是 __dirname（当前文件在 server/src/services/）
+  const serverDir = path.resolve(__dirname, '..')
+
+  // 从 server 目录创建 require，这样 require('playwright') 能正确解析到 server/node_modules
+  const serverRequire = createRequire(path.join(serverDir, 'package.json'))
+
+  // 项目根目录是 server 的父级
+  const projectRoot = path.resolve(serverDir, '..')
+
   // 查找 out/main 目录中的 autoRegister 文件（可能带 hash）
   const outMainDir = path.join(projectRoot, 'out/main')
   let autoRegisterPath: string | null = null
-  
+
   try {
-    // 检查 out/main 目录是否存在
     if (fs.existsSync(outMainDir)) {
       const files = fs.readdirSync(outMainDir)
-      // 查找 autoRegister-*.js 文件
       const autoRegisterFile = files.find(f => f.startsWith('autoRegister-') && f.endsWith('.js'))
-      
+
       if (autoRegisterFile) {
         autoRegisterPath = path.join(outMainDir, autoRegisterFile)
         console.log(`📦 找到编译后的 autoRegister 模块: ${autoRegisterFile}`)
@@ -154,19 +159,18 @@ export async function getAutoRegisterAWS() {
   } catch (error) {
     console.error('查找编译文件失败:', error)
   }
-  
-  // 如果没找到编译版本，尝试直接加载 TypeScript 源码（需要 ts-node）
+
   if (!autoRegisterPath) {
     console.log('⚠️  未找到编译版本，尝试加载 TypeScript 源码...')
     autoRegisterPath = path.join(projectRoot, 'src/main/autoRegister.ts')
   }
-  
+
   try {
     console.log(`📦 加载路径: ${autoRegisterPath}`)
     patchPlaywrightScreenshotPath(autoRegisterPath)
 
-    // 使用 require 动态加载（运行时解析）
-    const autoRegisterModule = require(autoRegisterPath)
+    // 使用 serverRequire 动态加载，这样 playwright 等依赖能从 server/node_modules 解析
+    const autoRegisterModule = serverRequire(autoRegisterPath)
 
     if (!autoRegisterModule || !autoRegisterModule.autoRegisterAWS) {
       throw new Error('autoRegisterAWS 函数未找到')
@@ -183,7 +187,7 @@ export async function getAutoRegisterAWS() {
       console.error('❌ playwright 未安装，无法执行自动注册任务')
       console.error('='.repeat(60))
       console.error('请在服务器上执行以下命令安装：')
-      console.error('  cd /root/桌面/autoKr')
+      console.error('  cd /root/桌面/autoKr/server')
       console.error('  npm install')
       console.error('  npx playwright install chromium')
       console.error('='.repeat(60) + '\n')
