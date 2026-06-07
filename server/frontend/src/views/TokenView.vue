@@ -344,9 +344,9 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <div style="display: flex; gap: 8px;">
+            <div style="displayflex; gap: 8px;">
               <el-button
                 v-if="row.access_token"
                 type="primary"
@@ -357,23 +357,13 @@
               </el-button>
               <el-button
                 v-if="canAutoRefresh(row)"
-                type="warning"
-                size="small"
-                :icon="Refresh"
-                :loading="refreshingIds.has(row.id)"
-                @click="refreshAccountToken(row)"
-              >
-                刷新
-              </el-button>
-              <el-button
-                v-if="row.access_token"
                 type="success"
                 size="small"
-                :icon="Refresh"
-                :loading="syncingIds.has(row.id)"
-                @click="syncAccountUsageData(row)"
+      Refresh"
+                :loading="refreshingIds.has(row.id)"
+                @click="refreshAccountQuota(row)"
               >
-                同步额度
+                刷新额度
               </el-button>
             </div>
           </template>
@@ -519,6 +509,68 @@ const refreshAccountToken = async (account: Account) => {
       const errorMsg = error.response?.data?.error || error.message || '刷新失败'
       ElMessage.error(errorMsg)
       
+      // 如果需要重新导入，提示用户
+      if (error.response?.data?.needReimport) {
+        ElMessageBox.alert(
+          '该账号缺少完整的 OAuth 凭证，无法自动刷新。请在"导入账号"页面重新导入该账号。',
+          '需要重新导入',
+          {
+            type: 'warning',
+            confirmButtonText: '知道了'
+          }
+        )
+      }
+    }
+  } finally {
+    refreshingIds.value.delete(account.id)
+  }
+}
+
+const refreshAccountQuota = async (account: Account) => {
+  if (!canAutoRefresh(account)) {
+    ElMessage.warning('该账号缺少 OAuth 凭证，无法自动刷新')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要刷新账号 ${account.email} 的额度吗？这将先刷新 Token，然后获取最新的额度信息。`,
+      '确认刷新额度',
+      {
+        type: 'warning',
+        confirmButtonText: '刷新',
+        cancelButtonText: '取消'
+      }
+    )
+
+    refreshingIds.value.add(account.id)
+
+    // 第一步：刷新 Token
+    const refreshResponse = await axios.post(`/api/token/${account.id}/refresh`)
+
+    if (!refreshResponse.data.success) {
+      throw new Error(refreshResponse.data.error || 'Token 刷新失败')
+    }
+
+    // 第二步：同步额度信息
+    const syncResponse = await axios.post(`/api/token/${account.id}/sync-usage`)
+
+    if (syncResponse.data.success) {
+      ElMessage.success('额度刷新成功')
+      // 重新加载账号列表
+      await loadTokens()
+      // 如果当前选中的是这个账号，更新显示
+      if (selectedAccount.value?.id === account.id) {
+        handleEmailChange(account.email)
+      }
+    } else {
+      throw new Error(syncResponse.data.error || '额度同步失败')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      const errorMsg = error.response?.data?.error || error.message || '刷新额度失败'
+      ElMessage.error(errorMsg)
+
       // 如果需要重新导入，提示用户
       if (error.response?.data?.needReimport) {
         ElMessageBox.alert(

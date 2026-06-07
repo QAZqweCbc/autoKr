@@ -13,7 +13,7 @@
 import { chromium, Browser, Page } from 'playwright'
 import Imap from 'imap'
 import { simpleParser } from 'mailparser'
-import * afrom 'fs'
+import * as fs from 'fs'
 import * as path from 'path'
 
 // 日志回调类型
@@ -25,7 +25,11 @@ const DEBUG_HTML_DIR = path.resolve(__dirname, '../../logs/debug-html')
 // 初始化调试目录
 function ensureDebugDir() {
   if (!fs.existsSync(DEBUG_HTML_DIR)) {
-    fs.mkdirSync(DEBUG_HTML_DIR, {旧的调试HTML文件（保留最近7天）
+    fs.mkdirSync(DEBUG_HTML_DIR, { recursive: true })
+  }
+}
+
+// 清理旧的调试HTML文件（保留最近7天）
 function cleanupOldDebugFiles() {
   try {
     ensureDebugDir()
