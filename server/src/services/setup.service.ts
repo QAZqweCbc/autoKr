@@ -23,7 +23,7 @@ const DB_ENV_KEYS = [
  * 更新 .env 中的数据库相关环境变量
  * 将对应的旧值替换为新值，保持 .env 与 JSON 配置一致
  */
-function updateDbEnvVars(vars: Record<string, string>): void {
+export function updateDbEnvVars(vars: Record<string, string>): void {
   if (!existsSync(ENV_FILE)) return
 
   try {
