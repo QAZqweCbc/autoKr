@@ -11,6 +11,7 @@ import {
   getConfigSource,
   DatabaseConfig
 } from '../services/database-config.service'
+import { updateDbEnvVars } from '../services/setup.service'
 
 /**
  * 获取数据库配置
@@ -66,6 +67,21 @@ export async function updateDatabaseConfig(req: Request, res: Response) {
     
     // 保存配置
     saveDatabaseConfig(newConfig)
+
+    // 同步更新 .env 中的数据库环境变量，避免优先级冲突
+    const envVars: Record<string, string> = {}
+    if (newConfig.storage === 'mysql') {
+      envVars.MYSQL_HOST = newConfig.mysql.host
+      envVars.MYSQL_PORT = String(newConfig.mysql.port)
+      envVars.MYSQL_USER = newConfig.mysql.user
+      envVars.MYSQL_PASSWORD = newConfig.mysql.password
+      envVars.MYSQL_DATABASE = newConfig.mysql.database
+    }
+    envVars.REDIS_HOST = newConfig.redis.host
+    envVars.REDIS_PORT = String(newConfig.redis.port)
+    envVars.REDIS_PASSWORD = newConfig.redis.password || ''
+    envVars.REDIS_DB = String(newConfig.redis.db)
+    updateDbEnvVars(envVars)
     
     // 🔥 热重载：如果存储模式改变，自动重新初始化数据库连接
     let reloadResult = {

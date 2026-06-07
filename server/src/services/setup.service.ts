@@ -13,6 +13,41 @@ import { loadDatabaseConfig, saveDatabaseConfig, DatabaseConfig } from './databa
 const ENV_FILE = path.join(process.cwd(), '.env')
 const SETUP_COMPLETE_FILE = path.join(process.cwd(), '.setup-completed')
 
+// .env 中数据库相关变量的前缀，Setup Wizard 需要同步更新这些值
+const DB_ENV_KEYS = [
+  'MYSQL_HOST', 'MYSQL_PORT', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE',
+  'REDIS_HOST', 'REDIS_PORT', 'REDIS_PASSWORD', 'REDIS_DB'
+]
+
+/**
+ * 更新 .env 中的数据库相关环境变量
+ * 将对应的旧值替换为新值，保持 .env 与 JSON 配置一致
+ */
+function updateDbEnvVars(vars: Record<string, string>): void {
+  if (!existsSync(ENV_FILE)) return
+
+  try {
+    let content = readFileSync(ENV_FILE, 'utf-8')
+
+    for (const [key, value] of Object.entries(vars)) {
+      // 构建正则：匹配 KEY= 开头的一行
+      const regex = new RegExp(`^${key}=.*$`, 'm')
+      if (regex.test(content)) {
+        content = content.replace(regex, `${key}=${value}`)
+      } else {
+        // 如果变量不存在，追加一行
+        content += `\n${key}=${value}\n`
+      }
+    }
+
+    writeFileSync(ENV_FILE, content, 'utf-8')
+    console.log('✅ 数据库环境变量已同步到 .env 文件')
+  } catch (error: any) {
+    console.error('❌ 更新 .env 文件失败:', error.message)
+    // 不抛出异常，不影响主流程
+  }
+}
+
 /**
  * 配置状态接口
  */

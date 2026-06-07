@@ -14,6 +14,7 @@ import {
   checkEnvVars,  generateEnvVars,
   saveEnvVars,
   markSetupComplete,
+  updateDbEnvVars,
   checkSystemDependencies
 } from '../services/setup.service'
 
@@ -104,6 +105,15 @@ app.post('/api/setup/mysql', async (req: Request, res: Response) => {
     }
 
     saveDatabaseConfig(newConfig)
+
+    // 同步更新 .env 中的数据库环境变量，避免优先级冲突
+    updateDbEnvVars({
+      MYSQL_HOST: host,
+      MYSQL_PORT: String(parseInt(port) || 3306),
+      MYSQL_USER: user,
+      MYSQL_PASSWORD: password || '',
+      MYSQL_DATABASE: database
+    })
 
     res.json({
       success: true,
@@ -196,6 +206,14 @@ app.post('/api/setup/redis', async (req: Request, res: Response) => {
     }
 
     saveDatabaseConfig(newConfig)
+
+    // 同步更新 .env 中的数据库环境变量，避免优先级冲突
+    updateDbEnvVars({
+      REDIS_HOST: host,
+      REDIS_PORT: String(parseInt(port) || 6379),
+      REDIS_PASSWORD: password || '',
+      REDIS_DB: String(parseInt(db) || 0)
+    })
 
     res.json({
       success: true,
