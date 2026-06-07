@@ -144,6 +144,10 @@ function migrateFromOldConfig(): boolean {
 /**
  * 加载数据库配置
  * 优先级: 环境变量 > JSON文件 > 默认值
+ *
+ * 🔧 自动同步机制：
+ * - 如果 JSON 配置文件存在但 .env 中的值是默认值，自动同步 JSON 到 .env
+ * - 这样换设备后首次启动会自动修复配置不一致问题
  */
 export function loadDatabaseConfig(): DatabaseConfig {
   // 首次运行时尝试迁移
@@ -154,6 +158,11 @@ export function loadDatabaseConfig(): DatabaseConfig {
   // 加载配置（按优先级合并）
   const fileConfig = loadFromFile()
 
+  // 🔧 自动同步检查：如果 JSON 文件存在且有效，但 .env 中是默认值，自动同步
+  const shouldAutoSync = checkAndAutoSyncEnv(fileConfig)
+  if (shouldAutoSync) {
+    console.log('🔄 检测到配置文件与 .env 不同步，正在自动同步...')
+  }
 
   // 字段级别的合并，而不是对象级别的合并
   const redisConfig = {
@@ -290,13 +299,97 @@ export function getConfigSource(): {
 } {
   const envConfig = loadFromEnv()
   const fileConfig = loadFromFile()
-  
+
   return {
-    storage: process.env.DATABASE_STORAGE ? 'env' : 
+    storage: process.env.DATABASE_STORAGE ? 'env' :
              fileConfig.storage ? 'file' : 'default',
-    mysql: envConfig.mysql ? 'env' : 
+    mysql: envConfig.mysql ? 'env' :
            fileConfig.mysql ? 'file' : 'default',
-    redis: envConfig.redis ? 'env' : 
+    redis: envConfig.redis ? 'env' :
            fileConfig.redis ? 'file' : 'default'
+  }
+}
+
+/**
+ * 检查并自动同步 JSON 配置到 .env 文件
+ *
+ * 场景：当 database.config.json 存在且包含有效配置，但 .env 中的值是默认值时
+ * 原因：换设备后 database.config.json 被 git 跟踪，但 .env 可能是旧的或从模板复制的
+ *
+ * @param fileConfig 从 JSON 文件加载的配置
+ * @returns 是否执行了同步操作
+ */
+function checkAndAutoSyncEnv(fileConfig: Partial<DatabaseConfig>): boolean {
+  // 如果 JSON 配置文件不存在或为空，跳过
+  if (!fileConfig || !fileConfig.mysql) {
+    return false
+  }
+
+  const ENV_FILE = path.join(process.cwd(), '.env')
+
+  // 如果 .env 文件不存在，跳过（让它使用默认值）
+  if (!existsSync(ENV_FILE)) {
+    return false
+  }
+
+  try {
+    // 检查 .env 中的 MySQL 配置是否是默认值
+    const envMysqlHost = process.env.MYSQL_HOST || ''
+    const envMysqlPort = process.env.MYSQL_PORT || ''
+    const envMysqlUser = process.env.MYSQL_USER || ''
+
+    // 判断条件：.env 中的配置是默认值，且 JSON 中有非默认值
+    const envIsDefault = (
+      envMysqlHost === 'localhost' || envMysqlHost === '' || envMysqlHost === DEFAULT_CONFIG.mysql.host
+    ) && (
+      envMysqlPort === '3306' || envMysqlPort === '' || envMysqlPort === String(DEFAULT_CONFIG.mysql.port)
+    ) && (
+      envMysqlUser === 'root' || envMysqlUser === '' || envMysqlUser === DEFAULT_CONFIG.mysql.user
+    )
+
+    const jsonHasConfig = (
+      fileConfig.mysql.host !== DEFAULT_CONFIG.mysql.host ||
+      fileConfig.mysql.port !== DEFAULT_CONFIG.mysql.port ||
+      fileConfig.mysql.user !== DEFAULT_CONFIG.mysql.user
+    )
+
+    // 如果 .env 是默认值，但 JSON 有自定义配置，执行同步
+    if (envIsDefault && jsonHasConfig) {
+      console.log('📝 检测到配置不同步:')
+      console.log(`   .env:  ${envMysqlHost}:${envMysqlPort} (${envMysqlUser})`)
+      console.log(`   JSON:  ${fileConfig.mysql.host}:${fileConfig.mysql.port} (${fileConfig.mysql.user})`)
+
+      // 同步 MySQL 配置
+      const envVars: Record<string, string> = {
+        MYSQL_HOST: fileConfig.mysql.host,
+        MYSQL_PORT: String(fileConfig.mysql.port),
+        MYSQL_USER: fileConfig.mysql.user,
+        MYSQL_PASSWORD: fileConfig.mysql.password,
+        MYSQL_DATABASE: fileConfig.mysql.database
+      }
+
+      // 同步 Redis 配置（如果存在）
+      if (fileConfig.redis) {
+        envVars.REDIS_HOST = fileConfig.redis.host
+        envVars.REDIS_PORT = String(fileConfig.redis.port)
+        envVars.REDIS_PASSWORD = fileConfig.redis.password || ''
+        envVars.REDIS_DB = String(fileConfig.redis.db)
+      }
+
+      // 调用 updateDbEnvVars 进行同步
+      // 动态导入以避免循环依赖
+      const { updateDbEnvVars } = require('./setup.service')
+      updateDbEnvVars(envVars)
+
+      console.log('✅ 配置已自动同步到 .env 文件')
+      console.log('💡 提示: 下次启动将直接使用正确的配置')
+
+      return true
+    }
+
+    return false
+  } catch (error: any) {
+    console.warn('⚠️  自动同步配置失败:', error.message)
+    return false
   }
 }
