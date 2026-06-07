@@ -174,10 +174,22 @@ app.use('/api/auth', authProxy as any)
 const SETUP_WIZARD_PUBLIC = path.join(__dirname, 'setup-wizard', 'public')
 const FRONTEND_DIST = path.join(__dirname, '../frontend/dist')
 
-if (require("fs").existsSync(SETUP_WIZARD_PUBLIC)) {
+if (existsSync(SETUP_WIZARD_PUBLIC)) {
+  // 独立 Setup Wizard 静态文件（旧版）
   app.use('/setup', express.static(SETUP_WIZARD_PUBLIC))
   app.get('/setup/*', (_req, res) => {
     res.sendFile(path.join(SETUP_WIZARD_PUBLIC, 'index.html'))
+  })
+} else {
+  // 使用 frontend/dist 提供 Setup 页面（Vue 应用）
+  // 静态资源挂载在根路径（/assets/xxx），因为前端构建资源引用的是绝对路径
+  app.use(express.static(FRONTEND_DIST))
+  // /setup 路径返回前端 index.html，Vue 应用根据 API 决定是否显示 SetupWizardView
+  app.get('/setup', (_req, res) => {
+    res.sendFile(path.join(FRONTEND_DIST, 'index.html'))
+  })
+  app.get('/setup/*', (_req, res) => {
+    res.sendFile(path.join(FRONTEND_DIST, 'index.html'))
   })
 }
 
