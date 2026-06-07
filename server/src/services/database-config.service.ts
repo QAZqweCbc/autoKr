@@ -167,14 +167,30 @@ export function loadDatabaseConfig(): DatabaseConfig {
     ...(process.env.REDIS_DB && { db: parseInt(process.env.REDIS_DB) })
   }
 
+  // 验证 storage 类型，必须是 'mysql' 或 'redis'，否则 fallback 到默认值
+  const rawStorage = envConfig.storage || fileConfig.storage || DEFAULT_CONFIG.storage
+  const storage: 'mysql' | 'redis' = ['mysql', 'redis'].includes(rawStorage) ? rawStorage : DEFAULT_CONFIG.storage
+
   const config: DatabaseConfig = {
-    storage: envConfig.storage || fileConfig.storage || DEFAULT_CONFIG.storage,
+    storage,
     mysql: {
       ...DEFAULT_CONFIG.mysql,
       ...fileConfig.mysql,
       ...envConfig.mysql
     },
     redis: redisConfig
+  }
+
+  // 如果 storage 是 mysql 但 mysql 配置为空，fallback 到 redis
+  if (storage === 'mysql' && (!config.mysql.host || !config.mysql.user)) {
+    console.warn('⚠️  MySQL 配置不完整，切换为 Redis 存储模式')
+    config.storage = 'redis'
+  }
+
+  // 如果 storage 是 redis 但 redis 配置为空，fallback 到 mysql
+  if (storage === 'redis' && (!config.redis.host)) {
+    console.warn('⚠️  Redis 配置不完整，切换为 MySQL 存储模式')
+    config.storage = 'mysql'
   }
 
   return config
