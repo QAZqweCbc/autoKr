@@ -647,34 +647,6 @@ const handleRefreshAll = async () => {
   }
 }
 
-const syncAccountUsageData = async (account: Account) => {
-  if (!account.access_token) {
-    ElMessage.warning('该账号没有 Access Token')
-    return
-  }
-
-  try {
-    syncingIds.value.add(account.id)
-
-    const response = await axios.post(`/api/token/${account.id}/sync-usage`)
-    
-    if (response.data.success) {
-      ElMessage.success('使用量同步成功')
-      // 重新加载账号列表
-      await loadTokens()
-      // 如果当前选中的是这个账号，更新显示
-      if (selectedAccount.value?.id === account.id) {
-        handleEmailChange(account.email)
-      }
-    }
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.error || error.message || '同步失败'
-    ElMessage.error(errorMsg)
-  } finally {
-    syncingIds.value.delete(account.id)
-  }
-}
-
 const handleSyncAllUsage = async () => {
   const syncableAccounts = accounts.value.filter(acc => acc.access_token)
   
