@@ -134,13 +134,21 @@ function patchPlaywrightScreenshotPath(autoRegisterPath: string) {
 // 运行时动态导入，避免 TypeScript 编译时检查
 export async function getAutoRegisterAWS() {
   // __dirname = server/src/services/
-  // server 目录 = 往上两层 = server/
-  // 项目根目录 = 往上三层 = kiroAuto/
   const serverDir = path.resolve(__dirname, '../../..')          // server/
   const projectRootDir = path.resolve(__dirname, '../../../')    // kiroAuto/ (项目根目录)
+  const playwrightDir = path.join(serverDir, 'node_modules')     // server/node_modules/
 
-  // 用 server/package.json 创建 require，这样 playwright 能从 server/node_modules 解析
-  const serverRequire = createRequire(path.join(serverDir, 'package.json'))
+  // 设置 NODE_PATH 让 require/import 能找到 playwright
+  const originalNodePath = process.env.NODE_PATH
+  if (!process.env.NODE_PATH || !process.env.NODE_PATH.split(path.delimiter).includes(playwrightDir)) {
+    if (process.env.NODE_PATH) {
+      process.env.NODE_PATH = process.env.NODE_PATH + path.delimiter + playwrightDir
+    } else {
+      process.env.NODE_PATH = playwrightDir
+    }
+    // 重新初始化模块解析路径
+    (require as any).module?.Module?.initPaths()
+  }
 
   // 查找 out/main 目录中的 autoRegister 文件（可能带 hash）
   const outMainDir = path.join(projectRootDir, 'out/main')
@@ -169,7 +177,8 @@ export async function getAutoRegisterAWS() {
     console.log(`📦 加载路径: ${autoRegisterPath}`)
     patchPlaywrightScreenshotPath(autoRegisterPath)
 
-    // 使用 serverRequire 动态加载，这样 playwright 等依赖能从 server/node_modules 解析
+    // 使用 serverRequire 动态加载
+    const serverRequire = createRequire(path.join(serverDir, 'package.json'))
     const autoRegisterModule = serverRequire(autoRegisterPath)
 
     if (!autoRegisterModule || !autoRegisterModule.autoRegisterAWS) {
