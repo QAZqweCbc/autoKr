@@ -179,19 +179,40 @@ async function executeTask(task: Task) {
       
       // 保存账号
       try {
+        // 从注册结果中提取正确的 OAuth 凭证
+        const accessToken = result.accessToken || result.ssoToken || ''
+        const refreshToken = result.refreshToken || result.ssoToken || ''
+        const clientId = result.clientId || task.client_id || ''
+        const clientSecret = result.clientSecret || ''
+
+        // 日志记录 token 来源
+        if (result.accessToken && result.refreshToken) {
+          log('✅ 获取到完整 OAuth 凭证 (accessToken + refreshToken + clientId)')
+        } else if (result.ssoToken) {
+          log('⚠️ 仅获取到 SSO Token，OAuth 凭证待补充')
+        } else {
+          log('⚠️ 未获取到任何凭证')
+        }
+
+        // 判断是否有完整的 OAuth 凭证
+        const hasFullOauthCredentials = refreshToken && clientId && clientSecret
+        const accountStatus = hasFullOauthCredentials
+          ? ('active' as AccountStatus)
+          : ('pending_oauth_setup' as AccountStatus)
+
         // 准备基本账号数据
         const baseAccountData = {
           id: uuidv4(),
           email: task.email,
           password: task.password,
           idp: 'BuilderId' as IdpType,
-          status: 'active' as AccountStatus,
-          isActive: true,
+          status: accountStatus,
+          isActive: hasFullOauthCredentials,
           credentials: {
-            accessToken: result.ssoToken || '',
-            refreshToken: task.auth_code,
-            clientId: task.client_id,
-            clientSecret: '',
+            accessToken,
+            refreshToken,
+            clientId,
+            clientSecret,
             region: 'us-east-1'
           },
           subscription: {
@@ -205,12 +226,12 @@ async function executeTask(task: Task) {
           },
           createdAt: Date.now()
         } as Account
-        
+
         // 尝试同步完整账号信息（用户信息、订阅信息、使用量等）
         log('正在获取账号详细信息...')
         console.log(`[${task.email}] 调用 Kiro API 同步账号信息...`)
-        
-        const syncResult = await syncAccountUsage(result.ssoToken || '', 'BuilderId')
+
+        const syncResult = await syncAccountUsage(accessToken, 'BuilderId')
         
         let accountData = baseAccountData
         if (syncResult.success && syncResult.data) {
