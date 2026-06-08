@@ -14,9 +14,16 @@ import {
 import { getEmailConfigForInternal } from '../services/email-config-manager.service'
 
 /**
+ * Electron mock 初始化标志（确保只执行一次，避免污染其他模块）
+ */
+let electronMockInstalled = false
+
+/**
  * Mock electron 模块（用于 Node.js 环境）
  */
 function mockElectronModule() {
+  if (electronMockInstalled) return  # 已安装则跳过，避免重复覆盖全局 require
+
   const Module = require('module')
   const originalRequire = Module.prototype.require
 
@@ -38,6 +45,7 @@ function mockElectronModule() {
   }
   
   console.log('✅ 已安装 Electron mock')
+  electronMockInstalled = true
 }
 
 /**
