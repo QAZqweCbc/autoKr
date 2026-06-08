@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AWS Builder ID 自动注册模块
  * 完全集成在 Electron 中，不依赖外部 Python 脚本
  * 
@@ -70,26 +70,16 @@ function saveDebugHtml(filename: string, content: string, log: LogCallback): str
     log(`📄 已保存 HTML: ${filePath}`)
     return filePath
   } catch (error) {
-    log(`⚠️ 保存 HTML 失败: ${error}`)
-    return ''
-  }
-}
-
-// 验证码正则表达式 - 支持新旧两种格式
 const CODE_PATTERNS = [
-  // AWS 新格式：字母+连字符 (如 ZNCD-SRPZ, roll-padd)
-  /(?:verification\s*code|验证码|Your code is|code is|Confirm this code)[：:\s]*([A-Z]{4}-[A-Z]{4})/gi,
-  /(?:verification\s*code|验证码|Your code is|code is|Confirm this code)[：:\s]*([a-z]{4}-[a-z]{4})/gi,
-  /^\s*([A-Z]{4}-[A-Z]{4})\s*$/gm,  // 单独一行的大写字母格式
-  /^\s*([a-z]{4}-[a-z]{4})\s*$/gm,  // 单独一行的小写字母格式
-  />\s*([A-Z]{4}-[A-Z]{4})\s*</g,   // HTML标签之间的大写字母格式
-  />\s*([a-z]{4}-[a-z]{4})\s*</g,   // HTML标签之间的小写字母格式
-  
-  // AWS 旧格式：6位数字（保留兼容）
-  /(?:verification\s*code|验证码|Your code is|code is)[：:\s]*(\d{6})/gi,
-  /(?:is|为)[：:\s]*(\d{6})\b/gi,
-  /^\s*(\d{6})\s*$/gm,  // 单独一行的6位数字
-  />\s*(\d{6})\s*</g,   // HTML标签之间的6位数字
+  /(?:verification\s*code|Your\s+code\s+is|Confirm\s+this\s+code|验证码)[：:\s]*([A-Z]{4}-[A-Z]{4})/gi,
+  /(?:verification\s*code|Your\s+code\s+is|Confirm\s+this\s+code|验证码)[：:\s]*([a-z]{4}-[a-z]{4})/gi,
+  /^\s*([A-Z]{4}-[A-Z]{4})\s*$/gm,
+  /^\s*([a-z]{4}-[a-z]{4})\s*$/gm,
+  />\s*([A-Z]{4}-[A-Z]{4})\s*</g,
+  />\s*([a-z]{4}-[a-z]{4})\s*</g,
+  /(?:verification\s*code|Your\s+code\s+is|验证码)[：:\s]*(\d{6})\b/gi,
+  /^\s*(\d{6})\s*$/gm,
+  />\s*(\d{6})\s*</g,
 ]
 
 // AWS 验证码发件人
@@ -671,16 +661,14 @@ async function getImapVerificationCode(
           
           imap.search(['UNSEEN'], (err, results) => {
             if (err) {
-              log(`搜索邮件失败: ${err}，尝试搜索所有邮件...`)
-              imap.search(['ALL'], (err2, results2) => {
-                if (err2) {
-                  log(`搜索所有邮件也失败: ${err2}`)
-                  setTimeout(checkMail, 5000)
-                  return
-                }
+              log('搜索未读邮件失败: ' + err + '，尝试搜索近期邮件...')
+              const yesterday = new Date()
+              yesterday.setDate(yesterday.getDate() - 1)
+              const sinceStr = 'SINCE ' + yesterday.getDate() + '/' + (yesterday.getMonth() + 1) + '/' + yesterday.getFullYear()
+              imap.search([sinceStr], (err2, results2) => {
+                if (err2) { log('搜索近期邮件也失败: ' + err2); setTimeout(checkMail, 5000); return }
                 processResults(results2)
               })
-              return
             }
             processResults(results)
           })
@@ -1112,42 +1100,30 @@ async function checkAndRetryOnError(
   retryDelay: number = 2000
 ): Promise<boolean> {
   // 错误弹窗的多种可能选择器
-  const errorSelectors = [
-    'div.awsui_content_mx3cw_97dyn_391',
-    '[class*="awsui_content_"]',
-    '.awsui-flash-error',
-    '[data-testid="flash-error"]'
-  ]
-  
+  // 通过页面文本内容检查错误信息（避免硬编码选择器）
   const errorTexts = [
-    '抱歉，处理您的请求时出错',
-    'Sorry, there was an error processing your request',
-    'error processing your request',
-    'Please try again',
-    '请重试'
+    "Sorry, there was an error processing your request",
+    "error processing your request",
+    "Please try again",
+    "请重试"
   ]
-  
+
   for (let retry = 0; retry < maxRetries; retry++) {
-    // 等待一下让页面响应
+    // 等待后重新检查页面状态
     await page.waitForTimeout(1500)
-    
-    // 检查是否有错误弹窗
+
+    // 检查页面文本是否包含错误信息
     let hasError = false
-    for (const selector of errorSelectors) {
-      try {
-        const errorElements = await page.locator(selector).all()
-        for (const el of errorElements) {
-          const text = await el.textContent()
-          if (text && errorTexts.some(errText => text.includes(errText))) {
-            hasError = true
-            log(`⚠ 检测到错误弹窗: "${text.substring(0, 50)}..."`)
-            break
-          }
+    try {
+      const bodyText = await page.textContent('body')
+      if (bodyText) {
+        hasError = errorTexts.some(errText => bodyText.includes(errText))
+        if (hasError) {
+          log(`检测到错误: ${bodyText.substring(0, 100).trim()}...`)
         }
-        if (hasError) break
-      } catch {
-        continue
       }
+    } catch (e) {
+      log(`检查页面文本失败: ${e}`)
     }
     
     if (!hasError) {
@@ -1577,7 +1553,6 @@ export async function autoRegisterAWS(
       
       // 如果是无痕模式，添加无痕参数
       if (browserConfig?.headless === true || !browserConfig?.showWindow) {
-        launchOptions.args.push('--incognito')
       }
     }
     

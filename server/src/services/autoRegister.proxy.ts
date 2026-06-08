@@ -1,4 +1,4 @@
-/**
+﻿/**
  * autoRegister 代理模块
  * 运行时动态加载主项目的 autoRegister，避免编译时路径问题
  */
@@ -173,12 +173,12 @@ export async function getAutoRegisterAWS() {
     autoRegisterPath = path.join(projectRootDir, 'src/main/autoRegister.ts')
   }
 
+    const serverRequire = createRequire(path.join(serverDir, 'package.json'))
   try {
     console.log(`📦 加载路径: ${autoRegisterPath}`)
     patchPlaywrightScreenshotPath(autoRegisterPath)
 
     // 使用 serverRequire 动态加载
-    const serverRequire = createRequire(path.join(serverDir, 'package.json'))
     const autoRegisterModule = serverRequire(autoRegisterPath)
 
     if (!autoRegisterModule || !autoRegisterModule.autoRegisterAWS) {
@@ -187,6 +187,28 @@ export async function getAutoRegisterAWS() {
 
     return autoRegisterModule.autoRegisterAWS
   } catch (error: any) {
+    // 新增：判断是否为 .ts 文件无法 require
+    if (autoRegisterPath.endsWith(".ts") && error.code === "MODULE_NOT_FOUND") {
+      console.error("\n" + "=".repeat(60))
+      console.error("无法直接加载 TypeScript 文件")
+      console.error("=".repeat(60))
+      console.error("请执行以下命令编译主项目后重试：")
+      console.error("  cd D:\\\kiroAuto")
+      console.error("  npm install && npm run build")
+      console.error("=".repeat(60) + "\n")
+      
+      try {
+        require("ts-node/register")
+        console.log("已注册 ts-node，重新加载...")
+        const mod2 = serverRequire(autoRegisterPath)
+        if (mod2?.autoRegisterAWS) return mod2.autoRegisterAWS
+      } catch (tsNodeError: any) {
+        console.error("ts-node 也未安装:", tsNodeError.message)
+      }
+      
+      throw new Error("请编译主项目后重试: npm run build")
+    }
+    
     // 判断是否为 playwright 缺失
     const isPlaywrightMissing = error.code === 'MODULE_NOT_FOUND' &&
       (error.message.includes('playwright') || error.requireStack?.some((s: string) => s.includes('playwright')))

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Kiro API 服务
  * 调用 AWS Kiro API 获取用户信息和使用量
  */
@@ -73,9 +73,10 @@ export async function kiroApiRequest<T>(
         errorMessage = errorData.message
       }
       console.error(`[Kiro API] Error:`, errorData)
-    } catch {
+    } catch (decodeError: any) {
       const errorText = Buffer.from(errorBuffer).toString('utf-8')
       console.error(`[Kiro API] Error (raw): ${errorText}`)
+      console.error(`[Kiro API] Error stack:`, decodeError.stack)
     }
     
     // 检测账号封禁状态
@@ -87,6 +88,13 @@ export async function kiroApiRequest<T>(
     }
     
     throw new Error(errorMessage)
+  }
+
+  // Content-Type 检查：非 CBOR 响应时抛出可读错误
+  const contentType = response.headers.get('content-type') || ''
+  if (!contentType.includes('cbor') && !contentType.includes('application/octet-stream')) {
+    const errorText = await response.text()
+    throw new Error(`Expected CBOR response, got: ${errorText.substring(0, 200)}`)
   }
 
   const arrayBuffer = await response.arrayBuffer()
@@ -174,21 +182,32 @@ export async function getUserUsageAndLimits(
   )
 }
 
+/**
+ * 带重试的获取用户使用量和限额
+ * 遇到 UnauthorizedException 时自动重试
+ */
 async function getUserUsageAndLimitsWithRetry(
   accessToken: string,
-  idp: string = 'BuilderId'
+  idp: string = 'BuilderId',
+  maxRetries: number = 2
 ): Promise<UsageResponse> {
-  try {
-    return await getUserUsageAndLimits(accessToken, idp)
-  } catch (error: any) {
-    if (!error?.message?.includes('UnauthorizedException')) {
-      throw error
+  let lastError: Error | null = null
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await getUserUsageAndLimits(accessToken, idp)
+    } catch (error: any) {
+      lastError = error
+      if (!error?.message?.includes('UnauthorizedException')) {
+        throw error
+      }
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 1500 * attempt))
+      }
     }
-
-    console.warn('[Kiro API] GetUserUsageAndLimits unauthorized, retrying once...')
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    return getUserUsageAndLimits(accessToken, idp)
   }
+  
+  throw lastError || new Error('All retries failed')
 }
 
 /**
@@ -244,7 +263,10 @@ export async function syncAccountUsage(
   try {
     // 并行调用两个 API
     const [userInfo, usageInfo] = await Promise.all([
-      getUserInfo(accessToken, idp).catch(() => undefined),
+      getUserInfo(accessToken, idp).catch((err) => {
+        console.warn(`[Kiro API] getUserInfo 失败: ${err.message}`)
+        return undefined
+      }),
       getUserUsageAndLimitsWithRetry(accessToken, idp)
     ])
 
