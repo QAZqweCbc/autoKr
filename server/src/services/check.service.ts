@@ -128,10 +128,21 @@ export async function getAllCheckRecords(limit?: number): Promise<CheckRecord[]>
  */
 export async function getCheckRecordById(id: string): Promise<CheckRecord | null> {
   const db = getDB()
-  
+
   if (db.CheckDB) {
-    // MySQL 不支持按 ID 查询单条记录，返回 null
-    return null
+    // 使用 MySQL
+    try {
+      const record = await db.CheckDB.getById(parseInt(id))
+      if (!record) return null
+      return {
+        id: record.id?.toString() || '',
+        timestamp: new Date(record.timestamp).getTime(),
+        proxyUrl: record.proxyUrl,
+        result: record.result
+      }
+    } catch {
+      return null
+    }
   } else {
     // 使用 JSON 文件
     const records = readRecords()
@@ -139,14 +150,16 @@ export async function getCheckRecordById(id: string): Promise<CheckRecord | null
   }
 }
 
+
 /**
  * 删除检测记录
  */
 export async function deleteCheckRecord(id: string): Promise<void> {
   const db = getDB()
-  
+
   if (db.CheckDB) {
-    // MySQL 不支持删除单条记录
+    // 使用 MySQL
+    await db.CheckDB.delete(parseInt(id))
     return
   } else {
     // 使用 JSON 文件
@@ -155,6 +168,7 @@ export async function deleteCheckRecord(id: string): Promise<void> {
     saveRecords(filtered)
   }
 }
+
 
 /**
  * 清空所有检测记录

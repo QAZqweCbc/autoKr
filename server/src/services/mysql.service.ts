@@ -590,6 +590,45 @@ export const MySQLCheckDB = {
     } finally {
       connection.release()
     }
+  },
+
+  /**
+   * 按 ID 获取单条检测记录
+   */
+  async getById(id: number): Promise<CheckRecord | null> {
+    const connection = await getPool().getConnection()
+    try {
+      const [rows] = await connection.execute(
+        `SELECT id, ip, proxy_url as proxyUrl, verdict, suggestion,
+                result_data as result, timestamp
+         FROM check_records
+         WHERE id = ?`)
+      const result = (rows as any[])[0]
+      if (!result) return null
+      return {
+        id: result.id,
+        ip: result.ip,
+        proxyUrl: result.proxyUrl || undefined,
+        verdict: result.verdict,
+        suggestion: result.suggestion,
+        result: typeof result.result === 'string' ? JSON.parse(result.result) : result.result,
+        timestamp: result.timestamp
+      }
+    } finally {
+      connection.release()
+    }
+  },
+
+  /**
+   * 按 ID 删除单条检测记录
+   */
+  async delete(id: number): Promise<void> {
+    const connection = await getPool().getConnection()
+    try {
+      await connection.execute('DELETE FROM check_records WHERE id = ?', [id])
+    } finally {
+      connection.release()
+    }
   }
 }
 
