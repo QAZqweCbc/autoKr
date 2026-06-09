@@ -36,14 +36,14 @@ export async function adminLogin(req: Request, res: Response) {
       })
     }
     
-    // 查询管理员账户（使用client_users表，但检查是否是admin@user.com）
+    // 查询管理员账户（仅允许固定管理员邮箱）
     if (email !== 'admin@user.com') {
       return res.status(401).json({
         success: false,
         message: '邮箱或密码错误'
       })
     }
-    
+
     const admin = await findClientUserByEmail(email)
     if (!admin) {
       return res.status(401).json({

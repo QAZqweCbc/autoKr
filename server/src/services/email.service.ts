@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 邮箱服务
  * 处理邮箱连接和邮件获取
  */
@@ -25,13 +25,19 @@ export async function fetchQQEmail(
   searchCriteria: any[] = ['UNSEEN']
 ): Promise<EmailMessage[]> {
   return new Promise((resolve, reject) => {
+    // 添加超时机制：60秒超时
+    const timeoutId = setTimeout(() => {
+      imap.end()
+      reject(new Error('获取邮件超时：超过60秒未完成处理'))
+    }, 60000)
+
     const imap = new Imap({
       user: email,
       password: authCode,
       host: 'imap.qq.com',
       port: 993,
       tls: true,
-      tlsOptions: { rejectUnauthorized: false }
+      tlsOptions: { rejectUnauthorized: true }
     })
 
     const messages: EmailMessage[] = []
@@ -39,17 +45,20 @@ export async function fetchQQEmail(
     imap.once('ready', () => {
       imap.openBox('INBOX', true, (err) => {
         if (err) {
+          clearTimeout(timeoutId)
           imap.end()
           return reject(err)
         }
 
         imap.search(searchCriteria, (err, results) => {
           if (err) {
+            clearTimeout(timeoutId)
             imap.end()
             return reject(err)
           }
 
           if (!results || results.length === 0) {
+            clearTimeout(timeoutId)
             imap.end()
             return resolve([])
           }
@@ -87,6 +96,7 @@ export async function fetchQQEmail(
           })
 
           fetch.once('error', (err) => {
+            clearTimeout(timeoutId)
             imap.end()
             reject(err)
           })
@@ -96,6 +106,7 @@ export async function fetchQQEmail(
             const checkComplete = setInterval(() => {
               if (processed >= results.length) {
                 clearInterval(checkComplete)
+                clearTimeout(timeoutId)
                 imap.end()
                 resolve(messages)
               }
@@ -106,6 +117,8 @@ export async function fetchQQEmail(
     })
 
     imap.once('error', (err) => {
+      clearTimeout(timeoutId)
+      imap.end()
       reject(err)
     })
 
@@ -160,7 +173,7 @@ export async function deleteEmail(
       host: 'imap.qq.com',
       port: 993,
       tls: true,
-      tlsOptions: { rejectUnauthorized: false }
+      tlsOptions: { rejectUnauthorized: true }
     })
 
     imap.once('ready', () => {
@@ -190,6 +203,7 @@ export async function deleteEmail(
     })
 
     imap.once('error', (err) => {
+      imap.end()
       reject(err)
     })
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 注册服务 - 执行自动注册任务
  * 🔄 预留接口，等待实现
  */
@@ -18,6 +18,10 @@ let MAX_CONCURRENT = 3 // 最大并发数
 
 // 任务队列
 const taskQueue: Task[] = []
+
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
 
 /**
  * 设置最大并发数
@@ -291,7 +295,7 @@ async function executeTask(task: Task) {
     if (taskQueue.length > 0) {
       const nextTask = taskQueue.shift()!
       console.log(`📤 从队列取出任务: ${nextTask.email}`)
-      executeTask(nextTask)
+      await executeTask(nextTask)
     }
   }
 }

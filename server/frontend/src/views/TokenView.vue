@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="token-view">
     <el-card>
       <template #header>
@@ -27,21 +27,20 @@
         style="margin-bottom: 24px;"
       >
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span>查看已注册账号的 AWS Access Token 和使用额�?/span>
+          <span>查看已注册账号的 AWS Access Token 和使用额度</span>
           <div style="display: flex; gap: 16px; font-size: 13px;">
-            <span>总账�? <strong>{{ accounts.length }}</strong></span>
-            <span>可自动刷�? <strong>{{ refreshableCount }}</strong></span>
-            <span>有额度信�? <strong>{{ accountsWithUsage }}</strong></span>
+            <span>总账号: <strong>{{ accounts.length }}</strong></span>
+            <span>可自动刷新: <strong>{{ refreshableCount }}</strong></span>
+            <span>有额度信息: <strong>{{ accountsWithUsage }}</strong></span>
           </div>
         </div>
       </el-alert>
 
-      <!-- 批量操作按钮 -->
       <div style="margin-bottom: 16px; display: flex; gap: 12px;">
-        <el-button 
-          type="success" 
-          :icon="Refresh" 
-          :loading="syncingAll" 
+        <el-button
+          type="success"
+          :icon="Refresh"
+          :loading="syncingAll"
           @click="handleSyncAllUsage"
         >
           同步所有使用量
@@ -52,12 +51,11 @@
           style="flex: 1; margin: 0;"
         >
           <span style="font-size: 13px;">
-            💡 提示：刷�?Token 会自动同步使用量。如果只需要更新额度信息，使用"同步使用�?功能�?
+            提示：刷新 Token 会自动同步使用量。如果只需要更新额度信息，使用“同步使用量”功能。
           </span>
         </el-alert>
       </div>
 
-      <!-- 账号选择 -->
       <el-form label-width="120px" style="max-width: 800px;">
         <el-form-item label="选择账号">
           <el-select
@@ -83,12 +81,11 @@
           </el-select>
         </el-form-item>
 
-        <!-- Access Token 显示 -->
         <el-form-item v-if="selectedToken" label="Access Token">
           <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
             <el-tag size="small" type="success">用于 API 调用</el-tag>
             <span style="font-size: 12px; color: #909399;">
-              格式: AWS SSO Token (�?aoa 开头，200-300字符)
+              格式: AWS SSO Token (以 aoa 开头，200-300 字符)
             </span>
           </div>
           <el-input
@@ -116,12 +113,11 @@
           </div>
         </el-form-item>
 
-        <!-- SSO Token 显示 -->
         <el-form-item v-if="selectedAccount && selectedAccount.sso_token" label="SSO Token">
           <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
             <el-tag size="small" type="info">x_amz_sso_authn</el-tag>
             <span style="font-size: 12px; color: #909399;">
-              格式: JWT (用于设备授权流程，不能直接调�?API)
+              格式: JWT (用于设备授权流程，不能直接调用 API)
             </span>
           </div>
           <el-input
@@ -131,7 +127,7 @@
             readonly
             style="font-family: monospace; font-size: 13px;"
           />
-          <div style="margin-t 8px;">
+          <div style="margin-top: 8px;">
             <el-button
               type="primary"
               :icon="CopyDocument"
@@ -142,11 +138,10 @@
           </div>
         </el-form-item>
 
-        <!-- 账号详情 -->
         <el-form-item v-if="selectedAccount" label="账号信息">
           <el-descriptions :column="2" border>
             <el-descriptions-item label="邮箱">{{ selectedAccount.email }}</el-descriptions-item>
-            <el-descriptions-item label="状�?>
+            <el-descriptions-item label="状态">
               <el-tag :type="getStatusType(selectedAccount.status)">
                 {{ selectedAccount.status }}
               </el-tag>
@@ -160,7 +155,6 @@
           </el-descriptions>
         </el-form-item>
 
-        <!-- 订阅信息 -->
         <el-form-item v-if="selectedAccount && selectedAccount.subscription_type" label="订阅信息">
           <el-descriptions :column="2" border>
             <el-descriptions-item label="订阅类型">
@@ -178,13 +172,11 @@
           </el-descriptions>
         </el-form-item>
 
-        <!-- 使用量信�?-->
         <el-form-item v-if="selectedAccount && selectedAccount.usage_limit !== undefined" label="使用额度">
           <div style="background: #f5f7fa; padding: 16px; border-radius: 8px;">
-            <!-- 总额�?-->
             <div style="margin-bottom: 16px;">
               <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                <span style="font-weight: 600;">总额�?/span>
+                <span style="font-weight: 600;">总额度</span>
                 <span>{{ selectedAccount.usage_current || 0 }} / {{ selectedAccount.usage_limit || 0 }}</span>
               </div>
               <el-progress
@@ -194,7 +186,6 @@
               />
             </div>
 
-            <!-- 基础额度 -->
             <div v-if="selectedAccount.base_limit !== undefined" style="margin-bottom: 16px;">
               <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
                 <span>基础额度</span>
@@ -207,7 +198,6 @@
               />
             </div>
 
-            <!-- 免费试用额度 -->
             <div v-if="selectedAccount.free_trial_limit !== undefined" style="margin-bottom: 16px;">
               <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
                 <span>免费试用额度</span>
@@ -224,7 +214,6 @@
               </div>
             </div>
 
-            <!-- 资源详情 -->
             <div v-if="selectedAccount.resource_type" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #dcdfe6;">
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px;">
                 <div>
@@ -248,26 +237,24 @@
           </div>
         </el-form-item>
 
-        <!-- OAuth 凭证状�?-->
         <el-form-item v-if="selectedAccount" label="自动刷新">
           <el-tag v-if="canAutoRefresh(selectedAccount)" type="success" size="large">
-            �?支持自动刷新
+            支持自动刷新
           </el-tag>
           <el-tag v-else type="warning" size="large">
-            �?不支持自动刷新（缺少 OAuth 凭证�?
+            不支持自动刷新（缺少 OAuth 凭证）
           </el-tag>
           <div style="margin-top: 8px; font-size: 13px; color: #909399;">
-            <div>Refresh Token: {{ selectedAccount.refresh_token ? '�? : '�? }}</div>
-            <div>Client ID: {{ selectedAccount.client_id ? '�? : '�? }}</div>
-            <div>Client Secret: {{ selectedAccount.client_secret ? '�? : '�? }}</div>
+            <div>Refresh Token: {{ selectedAccount.refresh_token ? '有' : '无' }}</div>
+            <div>Client ID: {{ selectedAccount.client_id ? '有' : '无' }}</div>
+            <div>Client Secret: {{ selectedAccount.client_secret ? '有' : '无' }}</div>
           </div>
         </el-form-item>
       </el-form>
 
-      <!-- 账号列表 -->
       <el-divider />
       <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-weight: 600; font-size: 16px;">所有账�?({{ accounts.length }})</span>
+        <span style="font-weight: 600; font-size: 16px;">所有账号 ({{ accounts.length }})</span>
         <div style="display: flex; gap: 12px; align-items: center;">
           <el-button
             v-if="selectedAccountIds.size > 0"
@@ -281,7 +268,7 @@
             type="primary"
             @click="selectAll"
           >
-            全�?({{ accounts.length }})
+            全选 ({{ accounts.length }})
           </el-button>
         </div>
       </div>
@@ -317,10 +304,10 @@
                 :show-text="false"
               />
             </div>
-            <span v-else style="color: #909399; font-size: 12px;">无数�?/span>
+            <span v-else style="color: #909399; font-size: 12px;">无数据</span>
           </template>
         </el-table-column>
-        <el-table-column label="状�? width="100">
+        <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small">
               {{ row.status }}
@@ -329,14 +316,14 @@
         </el-table-column>
         <el-table-column label="自动刷新" width="100">
           <template #default="{ row }">
-            <el-tag v-if="canAutoRefresh(row)" type="success" size="small">�?/el-tag>
-            <el-tag v-else type="info" size="small">�?/el-tag>
+            <el-tag v-if="canAutoRefresh(row)" type="success" size="small">支持</el-tag>
+            <el-tag v-else type="info" size="small">不支持</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="Token" width="100">
           <template #default="{ row }">
-            <el-tag v-if="row.access_token" type="success" size="small">�?已保�?/el-tag>
-            <el-tag v-else type="info" size="small">未保�?/el-tag>
+            <el-tag v-if="row.access_token" type="success" size="small">已保存</el-tag>
+            <el-tag v-else type="info" size="small">未保存</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="创建时间" width="160">
@@ -346,7 +333,7 @@
         </el-table-column>
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <div style="displayflex; gap: 8px;">
+            <div style="display: flex; gap: 8px;">
               <el-button
                 v-if="row.access_token"
                 type="primary"
@@ -370,7 +357,6 @@
         </el-table-column>
       </el-table>
 
-      <!-- 使用说明 -->
       <el-divider />
       <el-alert
         type="warning"
@@ -378,27 +364,25 @@
       >
         <template #title>
           <div style="font-size: 14px;">
-            <strong>⚠️ 注意事项</strong>
+            <strong>注意事项</strong>
             <ul style="margin: 8px 0 0 20px; padding: 0;">
               <li>Access Token 由自动注册流程生成并保存，或通过导入获得</li>
               <li>Token 具有时效性，建议启用自动刷新功能保持活跃</li>
               <li>只有具备完整 OAuth 凭证的账号才支持自动刷新</li>
-              <li>使用额度信息来自应用端导入，需要定期同�?/li>
-              <li>请勿�?Token 分享给他�?/li>
+              <li>使用额度信息来自应用端导入，需要定期同步</li>
+              <li>请勿将 Token 分享给他人</li>
             </ul>
           </div>
         </template>
       </el-alert>
     </el-card>
 
-    <!-- Token 导出对话�?-->
     <TokenExportDialog
       v-model="showExport"
       :selected-account-ids="Array.from(selectedAccountIds)"
     />
   </div>
 </template>
-
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -429,7 +413,7 @@ const refreshableCount = computed(() => {
   return accounts.value.filter(acc => canAutoRefresh(acc)).length
 })
 
-// 计算有使用量信息的账号数�?
+// 计算有使用量信息的账号数量
 const accountsWithUsage = computed(() => {
   return accounts.value.filter(acc => acc.usage_limit !== undefined).length
 })
@@ -460,7 +444,7 @@ const handleEmailChange = (email: string) => {
 const viewToken = (email: string) => {
   selectedEmail.value = email
   handleEmailChange(email)
-  // 滚动到顶�?
+  // 滚动到顶部
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
@@ -475,13 +459,13 @@ const handleRefreshToken = async () => {
 
 const refreshAccountToken = async (account: Account) => {
   if (!canAutoRefresh(account)) {
-    ElMessage.warning('该账号缺�?OAuth 凭证，无法自动刷�?)
+    ElMessage.warning('该账号缺少 OAuth 凭证，无法自动刷新')
     return
   }
 
   try {
     await ElMessageBox.confirm(
-      `确定要刷新账�?${account.email} �?Token 吗？`,
+      `确定要刷新账号 ${account.email} 的 Token 吗？`,
       '确认刷新',
       {
         type: 'warning',
@@ -493,12 +477,12 @@ const refreshAccountToken = async (account: Account) => {
     refreshingIds.value.add(account.id)
 
     const response = await axios.post(`/api/token/${account.id}/refresh`)
-    
+
     if (response.data.success) {
       ElMessage.success(response.data.message || 'Token 刷新成功')
       // 重新加载账号列表
       await loadTokens()
-      // 如果当前选中的是这个账号，更新显�?
+      // 如果当前选中的是这个账号，更新显示
       if (selectedAccount.value?.id === account.id) {
         handleEmailChange(account.email)
       }
@@ -507,15 +491,15 @@ const refreshAccountToken = async (account: Account) => {
     if (error !== 'cancel') {
       const errorMsg = error.response?.data?.error || error.message || '刷新失败'
       ElMessage.error(errorMsg)
-      
+
       // 如果需要重新导入，提示用户
       if (error.response?.data?.needReimport) {
         ElMessageBox.alert(
-          '该账号缺少完整的 OAuth 凭证，无法自动刷新。请�?导入账号"页面重新导入该账号�?,
-          '需要重新导�?,
+          '该账号缺少完整的 OAuth 凭证，无法自动刷新。请在“导入账号”页面重新导入该账号。',
+          '需要重新导入',
           {
             type: 'warning',
-            confirmButtonText: '知道�?
+            confirmButtonText: '知道了'
           }
         )
       }
@@ -527,13 +511,13 @@ const refreshAccountToken = async (account: Account) => {
 
 const refreshAccountQuota = async (account: Account) => {
   if (!canAutoRefresh(account)) {
-    ElMessage.warning('该账号缺�?OAuth 凭证，无法自动刷�?)
+    ElMessage.warning('该账号缺少 OAuth 凭证，无法自动刷新')
     return
   }
 
   try {
     await ElMessageBox.confirm(
-      `确定要刷新账�?${account.email} 的额度吗？这将先刷新 Token，然后获取最新的额度信息。`,
+      `确定要刷新账号 ${account.email} 的额度吗？这将先刷新 Token，然后获取最新的额度信息。`,
       '确认刷新额度',
       {
         type: 'warning',
@@ -558,7 +542,7 @@ const refreshAccountQuota = async (account: Account) => {
       ElMessage.success('额度刷新成功')
       // 重新加载账号列表
       await loadTokens()
-      // 如果当前选中的是这个账号，更新显�?
+      // 如果当前选中的是这个账号，更新显示
       if (selectedAccount.value?.id === account.id) {
         handleEmailChange(account.email)
       }
@@ -573,11 +557,11 @@ const refreshAccountQuota = async (account: Account) => {
       // 如果需要重新导入，提示用户
       if (error.response?.data?.needReimport) {
         ElMessageBox.alert(
-          '该账号缺少完整的 OAuth 凭证，无法自动刷新。请�?导入账号"页面重新导入该账号�?,
-          '需要重新导�?,
+          '该账号缺少完整的 OAuth 凭证，无法自动刷新。请在“导入账号”页面重新导入该账号。',
+          '需要重新导入',
           {
             type: 'warning',
-            confirmButtonText: '知道�?
+            confirmButtonText: '知道了'
           }
         )
       }
@@ -589,19 +573,19 @@ const refreshAccountQuota = async (account: Account) => {
 
 const handleRefreshAll = async () => {
   const refreshableAccounts = accounts.value.filter(acc => canAutoRefresh(acc))
-  
+
   if (refreshableAccounts.length === 0) {
-    ElMessage.warning('没有支持自动刷新的账�?)
+    ElMessage.warning('没有支持自动刷新的账号')
     return
   }
 
   try {
     await ElMessageBox.confirm(
-      `将刷�?${refreshableAccounts.length} 个账号的 Token，是否继续？`,
+      `将刷新 ${refreshableAccounts.length} 个账号的 Token，是否继续？`,
       '批量刷新确认',
       {
         type: 'warning',
-        confirmButtonText: '开始刷�?,
+        confirmButtonText: '开始刷新',
         cancelButtonText: '取消'
       }
     )
@@ -609,29 +593,29 @@ const handleRefreshAll = async () => {
     refreshingAll.value = true
 
     const response = await axios.post('/api/token/refresh-all')
-    
+
     if (response.data.success) {
       const { successCount, failedCount } = response.data
-      
-      // 重新加载账号列表（包含最新的额度数据�?
+
+      // 重新加载账号列表（包含最新的额度数据）
       await loadTokens()
-      
-      // 显示成功消息（明确提示额度已同步�?
-      ElMessage.success(`刷新完成：成�?${successCount} 个，失败 ${failedCount} 个（额度数据已同步）`)
-      
-      // 如果有失败的，显示详�?
+
+      // 显示成功消息（明确提示额度已同步）
+      ElMessage.success(`刷新完成：成功 ${successCount} 个，失败 ${failedCount} 个（额度数据已同步）`)
+
+      // 如果有失败的，显示详情
       if (failedCount > 0 && response.data.details) {
         const failedAccounts = response.data.details
           .filter((d: any) => !d.success)
           .map((d: any) => `${d.email}: ${d.error}`)
           .join('\n')
-        
+
         ElMessageBox.alert(
           failedAccounts,
-          `刷新失败的账�?(${failedCount})`,
+          `刷新失败的账号 (${failedCount})`,
           {
             type: 'warning',
-            confirmButtonText: '知道�?
+            confirmButtonText: '知道了'
           }
         )
       }
@@ -648,7 +632,7 @@ const handleRefreshAll = async () => {
 
 const handleSyncAllUsage = async () => {
   const syncableAccounts = accounts.value.filter(acc => acc.access_token)
-  
+
   if (syncableAccounts.length === 0) {
     ElMessage.warning('没有可同步的账号')
     return
@@ -656,11 +640,11 @@ const handleSyncAllUsage = async () => {
 
   try {
     await ElMessageBox.confirm(
-      `将同�?${syncableAccounts.length} 个账号的使用量，是否继续？`,
+      `将同步 ${syncableAccounts.length} 个账号的使用量，是否继续？`,
       '批量同步确认',
       {
         type: 'info',
-        confirmButtonText: '开始同�?,
+        confirmButtonText: '开始同步',
         cancelButtonText: '取消'
       }
     )
@@ -668,27 +652,27 @@ const handleSyncAllUsage = async () => {
     syncingAll.value = true
 
     const response = await axios.post('/api/token/sync-all-usage')
-    
+
     if (response.data.success) {
       const { successCount, failedCount } = response.data
-      ElMessage.success(`同步完成：成�?${successCount} 个，失败 ${failedCount} 个`)
-      
+      ElMessage.success(`同步完成：成功 ${successCount} 个，失败 ${failedCount} 个`)
+
       // 重新加载账号列表
       await loadTokens()
-      
-      // 如果有失败的，显示详�?
+
+      // 如果有失败的，显示详情
       if (failedCount > 0 && response.data.details) {
         const failedAccounts = response.data.details
           .filter((d: any) => !d.success)
           .map((d: any) => `${d.email}: ${d.error}`)
           .join('\n')
-        
+
         ElMessageBox.alert(
           failedAccounts,
-          `同步失败的账�?(${failedCount})`,
+          `同步失败的账号 (${failedCount})`,
           {
             type: 'warning',
-            confirmButtonText: '知道�?
+            confirmButtonText: '知道了'
           }
         )
       }
@@ -711,7 +695,7 @@ const copyToken = async () => {
 
   try {
     await navigator.clipboard.writeText(selectedToken.value)
-    ElMessage.success('Access Token 已复制到剪贴�?)
+    ElMessage.success('Access Token 已复制到剪贴板')
   } catch (error) {
     // 备用方案
     const textarea = document.createElement('textarea')
@@ -722,19 +706,19 @@ const copyToken = async () => {
     textarea.select()
     document.execCommand('copy')
     document.body.removeChild(textarea)
-    ElMessage.success('Access Token 已复制到剪贴�?)
+    ElMessage.success('Access Token 已复制到剪贴板')
   }
 }
 
 const copySsoToken = async () => {
   if (!selectedAccount.value?.sso_token) {
-    ElMessage.warning('该账号没�?SSO Token')
+    ElMessage.warning('该账号没有 SSO Token')
     return
   }
 
   try {
     await navigator.clipboard.writeText(selectedAccount.value.sso_token)
-    ElMessage.success('SSO Token (x_amz_sso_authn) 已复制到剪贴�?)
+    ElMessage.success('SSO Token (x_amz_sso_authn) 已复制到剪贴板')
   } catch (error) {
     // 备用方案
     const textarea = document.createElement('textarea')
@@ -745,7 +729,7 @@ const copySsoToken = async () => {
     textarea.select()
     document.execCommand('copy')
     document.body.removeChild(textarea)
-    ElMessage.success('SSO Token (x_amz_sso_authn) 已复制到剪贴�?)
+    ElMessage.success('SSO Token (x_amz_sso_authn) 已复制到剪贴板')
   }
 }
 
@@ -791,10 +775,10 @@ const handleSelectionChange = (selection: Account[]) => {
   selectedAccountIds.value = new Set(selection.map(acc => acc.id))
 }
 
-// 全�?
+// 全选
 const selectAll = () => {
   selectedAccountIds.value = new Set(accounts.value.map(acc => acc.id))
-  // 触发表格的全�?
+  // 触发表格全选
   accounts.value.forEach(row => {
     tableRef.value?.toggleRowSelection(row, true)
   })
@@ -806,7 +790,7 @@ const clearSelection = () => {
   tableRef.value?.clearSelection()
 }
 
-// 显示导出对话�?
+// 显示导出对话框
 const showExportDialog = () => {
   if (selectedAccountIds.value.size === 0) {
     ElMessage.warning('请先选择要导出的账号')

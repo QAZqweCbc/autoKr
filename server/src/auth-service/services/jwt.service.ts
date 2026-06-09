@@ -1,21 +1,33 @@
-/**
+﻿/**
  * JWT服务
  */
 
 import * as jwt from 'jsonwebtoken'
+import * as crypto from 'crypto'
 
-const JWT_SECRET = process.env.JWT_SECRET || (() => {
-  const isDevelopment = process.env.NODE_ENV !== 'production'
-  
-  if (isDevelopment) {
-    console.warn('⚠️  [Auth Service] 警告: 未设置 JWT_SECRET，使用默认密钥（仅用于开发）')
-    return 'default-jwt-secret-do-not-use-in-production-must-be-at-least-32-characters-long'
-  } else {
-    console.error('❌ 错误: 生产环境未设置 JWT_SECRET 环境变量！')
-    console.error('💡 请在 .env 文件中设置 JWT_SECRET')
-    console.error('💡 生成方法: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"')
-    process.exit(1)
+const isProduction = process.env.NODE_ENV === 'production'
+
+const JWT_SECRET = (() => {
+  const secret = process.env.JWT_SECRET
+
+  if (!secret) {
+    if (isProduction) {
+      console.error('错误: 生产环境未设置 JWT_SECRET 环境变量！')
+      console.error('请在 .env 文件中设置 JWT_SECRET')
+      console.error('生成方法: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"')
+      process.exit(1)
+    }
+
+    console.warn('警告: 未设置 JWT_SECRET，开发环境将使用临时密钥')
+    console.warn('提示: 临时密钥在进程重启后会变化，不适合生产环境')
+    return crypto.randomBytes(32).toString('hex')
   }
+
+  if (secret.length < 32) {
+    console.warn(`警告: JWT_SECRET 长度不足32字符（当前 ${secret.length} 字符），存在安全风险`)
+  }
+
+  return secret
 })()
 const JWT_EXPIRES_IN = '7d'
 

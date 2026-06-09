@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 检测控制器 - IP状态、AWS连接、邮箱服务检测
  */
 
@@ -22,7 +22,7 @@ let electronMockInstalled = false
  * Mock electron 模块（用于 Node.js 环境）
  */
 function mockElectronModule() {
-  if (electronMockInstalled) return  # 已安装则跳过，避免重复覆盖全局 require
+  if (electronMockInstalled) return  // 已安装则跳过，避免重复覆盖全局 require
 
   const Module = require('module')
   const originalRequire = Module.prototype.require

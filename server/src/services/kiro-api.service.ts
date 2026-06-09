@@ -43,7 +43,10 @@ export async function kiroApiRequest<T>(
   const encodedBody = encode(body)
   const bodyBuffer = Buffer.from(encodedBody)
 
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000)
   const response = await fetch(`${KIRO_API_BASE}/${operation}`, {
+    signal: controller.signal,
     method: 'POST',
     headers: {
       'accept': 'application/cbor',
@@ -58,6 +61,7 @@ export async function kiroApiRequest<T>(
     body: bodyBuffer
   })
 
+  clearTimeout(timeoutId)
   console.log(`[Kiro API] Response status: ${response.status}`)
 
   if (!response.ok) {
