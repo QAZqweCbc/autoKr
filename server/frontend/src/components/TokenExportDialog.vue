@@ -13,19 +13,19 @@
 
       <!-- 导出格式 -->
       <el-form-item label="导出格式">
-        <el-radio-group v-model="exportFormat">
+        <el-radio-group v-model="exportFormat" class="export-format-options">
           <el-radio value="aiclient2api">
-            <div style="display: flex; flex-direction: column;">
-              <span style="font-weight: 600;">AIClient2API 格式</span>
-              <span style="font-size: 12px; color: #909399;">
+            <div class="format-option">
+              <span class="format-title">AIClient2API 格式</span>
+              <span class="format-desc">
                 标准 OAuth 凭据格式，兼容 AIClient2API
               </span>
             </div>
           </el-radio>
-          <el-radio value="json" style="margin-top: 12px;">
-            <div style="display: flex; flex-direction: column;">
-              <span style="font-weight: 600;">JSON 自定义格式</span>
-              <span style="font-size: 12px; color: #909399;">
+          <el-radio value="json">
+            <div class="format-option">
+              <span class="format-title">JSON 自定义格式</span>
+              <span class="format-desc">
                 选择需要导出的字段
               </span>
             </div>
@@ -35,28 +35,32 @@
 
       <!-- 自定义字段选择 -->
       <el-form-item v-if="exportFormat === 'json'" label="导出字段">
-        <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="field-selection-card">
+          <div class="field-toolbar">
+            <span>已选择 {{ selectedFields.length }} / {{ allFieldKeys.length }} 个字段</span>
+            <div class="field-actions">
+              <el-button size="small" text @click="selectedFields = []">清空</el-button>
+              <el-button size="small" @click="selectAllFields">全选</el-button>
+            </div>
+          </div>
           <el-checkbox-group v-model="selectedFields">
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
-              <el-checkbox label="email">邮箱</el-checkbox>
-              <el-checkbox label="password">密码</el-checkbox>
-              <el-checkbox label="access_token">Access Token</el-checkbox>
-              <el-checkbox label="refresh_token">Refresh Token</el-checkbox>
-              <el-checkbox label="csrf_token">CSRF Token</el-checkbox>
-              <el-checkbox label="sso_token">SSO Token</el-checkbox>
-              <el-checkbox label="client_id">Client ID</el-checkbox>
-              <el-checkbox label="client_secret">Client Secret</el-checkbox>
-              <el-checkbox label="region">区域</el-checkbox>
-              <el-checkbox label="expires_at">过期时间</el-checkbox>
-              <el-checkbox label="subscription_type">订阅类型</el-checkbox>
-              <el-checkbox label="usage_current">当前用量</el-checkbox>
-              <el-checkbox label="usage_limit">用量限制</el-checkbox>
-              <el-checkbox label="status">状态</el-checkbox>
-              <el-checkbox label="nickname">昵称</el-checkbox>
-              <el-checkbox label="user_id">用户ID</el-checkbox>
+            <div class="field-groups">
+              <section v-for="group in fieldGroups" :key="group.title" class="field-group">
+                <div class="field-group-title">{{ group.title }}</div>
+                <div class="field-grid">
+                  <el-checkbox
+                    v-for="field in group.fields"
+                    :key="field.key"
+                    :label="field.key"
+                    class="field-option"
+                  >
+                    <span class="field-name">{{ field.label }}</span>
+                    <span class="field-key">{{ field.key }}</span>
+                  </el-checkbox>
+                </div>
+              </section>
             </div>
           </el-checkbox-group>
-          <el-button size="small" @click="selectAllFields">全选</el-button>
         </div>
       </el-form-item>
 
@@ -152,26 +156,45 @@ const includeExpired = ref(false)
 const copying = ref(false)
 const downloading = ref(false)
 
+const fieldGroups = [
+  {
+    title: '基础字段',
+    fields: [
+      { key: 'email', label: '邮箱' },
+      { key: 'password', label: '密码' },
+      { key: 'status', label: '状态' },
+      { key: 'nickname', label: '昵称' },
+      { key: 'user_id', label: '用户 ID' },
+      { key: 'region', label: '区域' }
+    ]
+  },
+  {
+    title: 'Token 凭证',
+    fields: [
+      { key: 'access_token', label: 'Access Token' },
+      { key: 'refresh_token', label: 'Refresh Token' },
+      { key: 'csrf_token', label: 'CSRF Token' },
+      { key: 'sso_token', label: 'SSO Token' },
+      { key: 'client_id', label: 'Client ID' },
+      { key: 'client_secret', label: 'Client Secret' },
+      { key: 'expires_at', label: '过期时间' }
+    ]
+  },
+  {
+    title: '订阅与额度',
+    fields: [
+      { key: 'subscription_type', label: '订阅类型' },
+      { key: 'usage_current', label: '当前用量' },
+      { key: 'usage_limit', label: '用量限制' }
+    ]
+  }
+] as const
+
+const allFieldKeys = fieldGroups.flatMap(group => group.fields.map(field => field.key))
+
 // 全选字段
 const selectAllFields = () => {
-  selectedFields.value = [
-    'email',
-    'password',
-    'access_token',
-    'refresh_token',
-    'csrf_token',
-    'sso_token',
-    'client_id',
-    'client_secret',
-    'region',
-    'expires_at',
-    'subscription_type',
-    'usage_current',
-    'usage_limit',
-    'status',
-    'nickname',
-    'user_id'
-  ]
+  selectedFields.value = [...allFieldKeys]
 }
 
 // 获取导出数据
@@ -286,3 +309,114 @@ watch(exportFormat, (newFormat) => {
   }
 })
 </script>
+
+<style scoped>
+.export-format-options {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.export-format-options :deep(.el-radio) {
+  height: auto;
+  margin-right: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+}
+
+.format-option {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.format-title {
+  font-weight: 700;
+}
+
+.format-desc,
+.field-key,
+.field-toolbar {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.field-selection-card {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: #f8fafc;
+}
+
+.field-toolbar,
+.field-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-toolbar {
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.field-groups {
+  display: grid;
+  gap: 10px;
+}
+
+.field-group {
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+}
+
+.field-group-title {
+  margin-bottom: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.field-option {
+  min-height: 36px;
+  margin-right: 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.field-option :deep(.el-checkbox__label) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.field-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .field-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

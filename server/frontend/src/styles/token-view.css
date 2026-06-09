@@ -1,6 +1,148 @@
-/* TokenView页面样式 */
-
 .token-view {
-  max-width: 1400px;
+  max-width: 1440px;
   margin: 0 auto;
+}
+
+.token-card {
+  overflow: hidden;
+}
+
+.token-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.token-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.token-subtitle {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.token-actions,
+.inline-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.summary-alert,
+.sync-tip {
+  margin-bottom: 14px;
+}
+
+.summary-row,
+.sync-row,
+.table-toolbar,
+.account-option,
+.usage-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.summary-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.sync-row {
+  margin-bottom: 14px;
+}
+
+.sync-tip {
+  flex: 1;
+}
+
+.detail-form {
+  max-width: 900px;
+}
+
+.token-meta {
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.token-tip,
+.muted-text,
+.usage-note,
+.refresh-meta {
+  color: #909399;
+  font-size: 12px;
+}
+
+.mono-input :deep(textarea) {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.usage-panel {
+  width: 100%;
+  background: #f8fafc;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+}
+
+.usage-block + .usage-block {
+  margin-top: 12px;
+}
+
+.resource-grid {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #dcdfe6;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.resource-label,
+.quota-text,
+.notice-box ul {
+  color: var(--text-secondary);
+}
+
+.refresh-meta {
+  margin-top: 8px;
+}
+
+.section-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.notice-box ul {
+  margin: 6px 0 0 18px;
+  padding: 0;
+}
+
+@media (max-width: 900px) {
+  .token-header,
+  .summary-row,
+  .sync-row,
+  .table-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .summary-stats {
+    flex-wrap: wrap;
+  }
+
+  .resource-grid {
+    grid-template-columns: 1fr;
+  }
 }

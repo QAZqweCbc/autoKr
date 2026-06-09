@@ -32,7 +32,7 @@
             <div class="tip-title">快速创建注册任务</div>
             <div class="tip-desc">前往"账号生成"页面，生成账号后可一键批量创建注册任务</div>
           </div>
-          <el-button type="primary" class="btn-gradient" @click="router.push('/generator')">
+          <el-button type="primary" class="btn-gradient" @click="router.push('/accounts')">
             前往生成账号 →
           </el-button>
         </div>
@@ -180,7 +180,7 @@
         <template #description>
           <div class="empty-desc">
             <p>{{ statusFilter ? '没有符合条件的任务' : '还没有任何任务' }}</p>
-            <el-button v-if="!statusFilter" type="primary" class="btn-gradient" @click="router.push('/generator')">
+            <el-button v-if="!statusFilter" type="primary" class="btn-gradient" @click="router.push('/accounts')">
               立即创建
             </el-button>
           </div>

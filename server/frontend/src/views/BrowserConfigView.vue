@@ -118,31 +118,39 @@
 
         <!-- 人类行为模拟 -->
         <el-divider />
-        <h3 style="margin: 20px 0 15px 0; color: #667eea;">人类行为模拟</h3>
+        <section class="behavior-panel">
+          <div class="section-heading">
+            <div>
+              <h3>人类行为模拟</h3>
+              <p>控制自动化操作之间的随机等待区间，降低固定节奏带来的异常风险。</p>
+            </div>
+            <el-tag type="info" effect="plain">建议 3-8 秒</el-tag>
+          </div>
 
-        <el-form-item label="最小延迟（秒）">
-          <el-input-number
-            v-model="form.delayMin"
-            :min="1"
-            :max="30"
-            style="width: 200px;"
-          />
-          <span style="color: #6b7280; font-size: 13px; margin-left: 12px;">
-            操作之间的最小等待时间
-          </span>
-        </el-form-item>
+          <div class="behavior-grid">
+            <div class="behavior-item">
+              <div class="behavior-label">最小延迟</div>
+              <el-input-number
+                v-model="form.delayMin"
+                :min="1"
+                :max="30"
+                controls-position="right"
+              />
+              <div class="behavior-hint">每次操作后至少等待的秒数</div>
+            </div>
 
-        <el-form-item label="最大延迟（秒）">
-          <el-input-number
-            v-model="form.delayMax"
-            :min="1"
-            :max="60"
-            style="width: 200px;"
-          />
-          <span style="color: #6b7280; font-size: 13px; margin-left: 12px;">
-            操作之间的最大等待时间（必须大于最小延迟）
-          </span>
-        </el-form-item>
+            <div class="behavior-item">
+              <div class="behavior-label">最大延迟</div>
+              <el-input-number
+                v-model="form.delayMax"
+                :min="1"
+                :max="60"
+                controls-position="right"
+              />
+              <div class="behavior-hint">必须大于最小延迟，用于随机区间上限</div>
+            </div>
+          </div>
+        </section>
 
         <!-- 操作按钮 -->
         <el-divider />

@@ -41,7 +41,7 @@
           description="暂无数据,创建账号后将显示域名分布" 
           :image-size="100"
         >
-          <el-button type="primary" @click="router.push('/generator')">
+          <el-button type="primary" @click="router.push('/accounts')">
             立即生成账号
           </el-button>
         </el-empty>
@@ -71,7 +71,7 @@
           description="暂无数据,创建账号后将显示注册趋势" 
           :image-size="100"
         >
-          <el-button type="primary" @click="router.push('/generator')">
+          <el-button type="primary" @click="router.push('/accounts')">
             立即生成账号
           </el-button>
         </el-empty>
@@ -91,7 +91,7 @@
           type="primary"
           class="btn-gradient action-btn"
           size="large"
-          @click="router.push('/generator')"
+          @click="router.push('/accounts')"
         >
           <span class="btn-icon">🎲</span>
           <span>生成账号</span>

@@ -1,18 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-// 检查管理员登录状态
 function isAdminLoggedIn(): boolean {
-  const token = localStorage.getItem('admin_token')
-  return !!token
+  return !!localStorage.getItem('admin_token')
 }
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    {
-      path: '/',
-      redirect: '/dashboard'
-    },
+    { path: '/', redirect: '/dashboard' },
     {
       path: '/dashboard',
       name: 'dashboard',
@@ -35,7 +30,7 @@ const router = createRouter({
       path: '/generator',
       name: 'generator',
       component: () => import('../views/GeneratorView.vue'),
-      meta: { title: '账号生成', icon: '🎲' }
+      meta: { title: '账号生成', icon: '✨', hiddenInMenu: true }
     },
     {
       path: '/check',
@@ -47,13 +42,13 @@ const router = createRouter({
       path: '/token',
       name: 'token',
       component: () => import('../views/TokenView.vue'),
-      meta: { title: 'Token管理', icon: '🔑' }
+      meta: { title: 'Token 管理', icon: '🔑' }
     },
     {
       path: '/import',
       name: 'import',
       component: () => import('../views/ImportAccountView.vue'),
-      meta: { title: '导入账号', icon: '📥' }
+      meta: { title: '导入账号', icon: '📥', hiddenInMenu: true }
     },
     {
       path: '/email',
@@ -77,7 +72,7 @@ const router = createRouter({
       path: '/logs',
       name: 'logs',
       component: () => import('../views/LogsView.vue'),
-      meta: { title: '实时日志', icon: '📊' }
+      meta: { title: '实时日志', icon: '📄' }
     },
     {
       path: '/deletion-logs',
@@ -100,19 +95,12 @@ const router = createRouter({
   ]
 })
 
-// 路由守卫
 router.beforeEach((to, _from, next) => {
-  // 检查路由是否需要管理员权限
-  if (to.meta.requiresAuth) {
-    if (isAdminLoggedIn()) {
-      next()
-    } else {
-      // 未登录，重定向到管理员登录页
-      next({ name: 'admin-login', query: { redirect: to.fullPath } })
-    }
-  } else {
-    next()
+  if (to.meta.requiresAuth && !isAdminLoggedIn()) {
+    next({ name: 'admin-login', query: { redirect: to.fullPath } })
+    return
   }
+  next()
 })
 
 export default router
