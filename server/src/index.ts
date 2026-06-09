@@ -38,7 +38,7 @@ validateJwtSetup()
 const app = express()
 const httpServer = createServer(app)
 
-const PORT = process.env.PORT || 1455
+const PORT = process.env.PORT || 14558
 
 // 存储守护检查结果，供路由判断是否需要显示 setup 页面
 let guardResult: StartupGuardResult | null = null
@@ -84,11 +84,11 @@ function logStartupError(error: any) {
 // CORS 配置
 // ============================================
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [
-  'http://localhost:1455',
+  'http://localhost:14558',
   'http://localhost:5173',  // Vite dev server
-  'http://127.0.0.1:1455',
+  'http://127.0.0.1:14558',
   'http://127.0.0.1:5173',
-  'http://0.0.0.0:1455',
+  'http://0.0.0.0:14558',
   'http://0.0.0.0:5173',
   'http://0.0.0.0:3000'
 ]

@@ -7,6 +7,25 @@ import { Account, AccountStats } from '../models/account.model'
 import { accountToFlat, flatToAccount, updateAccountUsage } from '../utils/account-mapper'
 import { withTransaction } from '../utils/transaction.util'
 
+const ACCOUNT_INSERT_FIELDS = [
+  'id', 'email', 'password',
+  'access_token', 'csrf_token', 'refresh_token', 'x_amz_sso_authn', 'client_id', 'client_secret', 'region', 'expires_at', 'auth_method', 'provider',
+  'subscription_type', 'subscription_title', 'subscription_raw_type', 'subscription_expires_at', 'subscription_days_remaining',
+  'upgrade_capability', 'overage_capability', 'management_target',
+  'usage_current', 'usage_limit', 'usage_percent_used', 'usage_last_updated',
+  'base_limit', 'base_current', 'free_trial_limit', 'free_trial_current', 'free_trial_expiry',
+  'usage_bonuses', 'next_reset_date',
+  'resource_type', 'resource_display_name', 'resource_display_name_plural', 'resource_currency', 'resource_unit',
+  'overage_rate', 'overage_cap', 'overage_enabled',
+  'nickname', 'idp', 'user_id', 'visitor_id', 'group_id', 'tags',
+  'status', 'last_error', 'consecutive_failures', 'is_active', 'device_id', 'assigned_at',
+  'created_at', 'last_used_at', 'last_checked_at', 'owner_user_id'
+] as const
+
+const ACCOUNT_UPDATE_FIELDS = ACCOUNT_INSERT_FIELDS.filter(
+  (field) => !['id', 'email', 'created_at'].includes(field)
+)
+
 export const MySQLAccountDB = {
   /**
    * 创建账号（使用事务保护）
@@ -16,20 +35,7 @@ export const MySQLAccountDB = {
       const flat = accountToFlat(account)
       
       // 确保所有值都不是 undefined
-      const values = [
-        flat.id, flat.email, flat.password,
-        flat.access_token, flat.csrf_token, flat.refresh_token, flat.x_amz_sso_authn, flat.client_id, flat.client_secret, flat.region, flat.expires_at, flat.auth_method, flat.provider,
-        flat.subscription_type, flat.subscription_title, flat.subscription_raw_type, flat.subscription_expires_at, flat.subscription_days_remaining,
-        flat.upgrade_capability, flat.overage_capability, flat.management_target,
-        flat.usage_current, flat.usage_limit, flat.usage_percent_used, flat.usage_last_updated,
-        flat.base_limit, flat.base_current, flat.free_trial_limit, flat.free_trial_current, flat.free_trial_expiry,
-        flat.usage_bonuses, flat.next_reset_date,
-        flat.resource_type, flat.resource_display_name, flat.resource_display_name_plural, flat.resource_currency, flat.resource_unit,
-        flat.overage_rate, flat.overage_cap, flat.overage_enabled,
-        flat.nickname, flat.idp, flat.user_id, flat.visitor_id, flat.group_id, flat.tags,
-        flat.status, flat.last_error, flat.consecutive_failures, flat.is_active, flat.device_id, flat.assigned_at,
-        flat.created_at, flat.last_used_at, flat.last_checked_at, flat.owner_user_id
-      ]
+      const values = ACCOUNT_INSERT_FIELDS.map((field) => flat[field] ?? null)
       
       // 检查 undefined 值
       const undefinedIndexes = values.map((v, i) => v === undefined ? i : -1).filter(i => i !== -1)
@@ -41,74 +47,11 @@ export const MySQLAccountDB = {
       
       await connection.execute(
         `INSERT INTO accounts (
-          id, email, password, 
-          access_token, csrf_token, refresh_token, x_amz_sso_authn, client_id, client_secret, region, expires_at, auth_method, provider,
-          subscription_type, subscription_title, subscription_raw_type, subscription_expires_at, subscription_days_remaining,
-          upgrade_capability, overage_capability, management_target,
-          usage_current, usage_limit, usage_percent_used, usage_last_updated,
-          base_limit, base_current, free_trial_limit, free_trial_current, free_trial_expiry,
-          usage_bonuses, next_reset_date,
-          resource_type, resource_display_name, resource_display_name_plural, resource_currency, resource_unit,
-          overage_rate, overage_cap, overage_enabled,
-          nickname, idp, user_id, visitor_id, group_id, tags,
-          status, last_error, consecutive_failures, is_active, device_id, assigned_at,
-          created_at, last_used_at, last_checked_at, owner_user_id
+          ${ACCOUNT_INSERT_FIELDS.join(', ')}
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (${ACCOUNT_INSERT_FIELDS.map(() => '?').join(', ')})
         ON DUPLICATE KEY UPDATE
-          password = VALUES(password),
-          access_token = VALUES(access_token),
-          csrf_token = VALUES(csrf_token),
-          refresh_token = VALUES(refresh_token),
-          x_amz_sso_authn = VALUES(x_amz_sso_authn),
-          client_id = VALUES(client_id),
-          client_secret = VALUES(client_secret),
-          region = VALUES(region),
-          expires_at = VALUES(expires_at),
-          auth_method = VALUES(auth_method),
-          provider = VALUES(provider),
-          subscription_type = VALUES(subscription_type),
-          subscription_title = VALUES(subscription_title),
-          subscription_raw_type = VALUES(subscription_raw_type),
-          subscription_expires_at = VALUES(subscription_expires_at),
-          subscription_days_remaining = VALUES(subscription_days_remaining),
-          upgrade_capability = VALUES(upgrade_capability),
-          overage_capability = VALUES(overage_capability),
-          management_target = VALUES(management_target),
-          usage_current = VALUES(usage_current),
-          usage_limit = VALUES(usage_limit),
-          usage_percent_used = VALUES(usage_percent_used),
-          usage_last_updated = VALUES(usage_last_updated),
-          base_limit = VALUES(base_limit),
-          base_current = VALUES(base_current),
-          free_trial_limit = VALUES(free_trial_limit),
-          free_trial_current = VALUES(free_trial_current),
-          free_trial_expiry = VALUES(free_trial_expiry),
-          usage_bonuses = VALUES(usage_bonuses),
-          next_reset_date = VALUES(next_reset_date),
-          resource_type = VALUES(resource_type),
-          resource_display_name = VALUES(resource_display_name),
-          resource_display_name_plural = VALUES(resource_display_name_plural),
-          resource_currency = VALUES(resource_currency),
-          resource_unit = VALUES(resource_unit),
-          overage_rate = VALUES(overage_rate),
-          overage_cap = VALUES(overage_cap),
-          overage_enabled = VALUES(overage_enabled),
-          nickname = VALUES(nickname),
-          idp = VALUES(idp),
-          user_id = VALUES(user_id),
-          visitor_id = VALUES(visitor_id),
-          group_id = VALUES(group_id),
-          tags = VALUES(tags),
-          status = VALUES(status),
-          last_error = VALUES(last_error),
-          consecutive_failures = VALUES(consecutive_failures),
-          is_active = VALUES(is_active),
-          device_id = VALUES(device_id),
-          assigned_at = VALUES(assigned_at),
-          last_used_at = VALUES(last_used_at),
-          last_checked_at = VALUES(last_checked_at),
-          owner_user_id = VALUES(owner_user_id)`,
+          ${ACCOUNT_UPDATE_FIELDS.map((field) => `${field} = VALUES(${field})`).join(',\n          ')}`,
         values
       )
       

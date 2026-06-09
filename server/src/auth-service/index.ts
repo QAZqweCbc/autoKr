@@ -26,9 +26,9 @@ const PORT = process.env.AUTH_PORT || 2233
 // CORS 配置
 // ============================================
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [
-  'http://localhost:1455',
+  'http://localhost:14558',
   'http://localhost:5173',
-  'http://127.0.0.1:1455',
+  'http://127.0.0.1:14558',
   'http://127.0.0.1:5173'
 ]
 
@@ -149,7 +149,7 @@ async function start() {
       console.log('='.repeat(60))
       console.log('\n💡 提示:')
       console.log('   - 此服务运行在独立端口2233')
-      console.log('   - 主服务运行在端口1455')
+  console.log('   - 主服务运行在端口14558')
       console.log('   - 按 Ctrl+C 停止服务器')
       console.log('')
     })

@@ -202,7 +202,7 @@ async function executeTask(task: Task) {
         const hasFullOauthCredentials = refreshToken && clientId && clientSecret
         const accountStatus = hasFullOauthCredentials
           ? ('active' as AccountStatus)
-          : ('pending_oauth_setup' as AccountStatus)
+          : ('pending' as AccountStatus)
 
         // 准备基本账号数据
         const baseAccountData = {

@@ -70,6 +70,11 @@ function saveDebugHtml(filename: string, content: string, log: LogCallback): str
     log(`📄 已保存 HTML: ${filePath}`)
     return filePath
   } catch (error) {
+    log(`⚠ 保存调试 HTML 失败: ${error}`)
+    return ''
+  }
+}
+
 const CODE_PATTERNS = [
   /(?:verification\s*code|Your\s+code\s+is|Confirm\s+this\s+code|验证码)[：:\s]*([A-Z]{4}-[A-Z]{4})/gi,
   /(?:verification\s*code|Your\s+code\s+is|Confirm\s+this\s+code|验证码)[：:\s]*([a-z]{4}-[a-z]{4})/gi,

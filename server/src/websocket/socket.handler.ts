@@ -70,19 +70,17 @@ export function emitAccountUpdate() {
 export function emitTaskLog(taskId: string, message: string) {
   if (!io) return
   
-  // 发送到订阅该任务的客户端
-  io.to(`task:${taskId}`).emit('task:log', {
+  const payload = {
     taskId,
     message,
     timestamp: Date.now()
-  })
+  }
   
-  // 同时广播到所有客户端（用于全局日志）
-  io.emit('log', {
-    taskId,
-    message,
-    timestamp: Date.now()
-  })
+  // 实时日志页默认不订阅单个任务，所以任务日志需要全局广播
+  io.emit('task:log', payload)
+  
+  // 兼容旧客户端监听 log 事件
+  io.emit('log', payload)
 }
 
 /**

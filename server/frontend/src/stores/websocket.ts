@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+﻿import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { io, Socket } from 'socket.io-client'
 
@@ -8,7 +8,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
   const logs = ref<Array<{ time: string; message: string }>>([])
 
   const connect = () => {
-    if (socket.value?.connected) return
+    if (socket.value) return
 
     socket.value = io('/', {
       transports: ['websocket', 'polling'],
@@ -28,7 +28,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
       addLog('❌ WebSocket 已断开')
     })
 
-    socket.value.on('log', (data: { message: string }) => {
+    socket.value.on('log', (data: { taskId?: string; message: string }) => {
+      if (data.taskId) return
       addLog(`💬 ${data.message}`)
     })
 
@@ -66,6 +67,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
   }
 
   const disconnect = () => {
+    socket.value?.removeAllListeners()
     socket.value?.disconnect()
     socket.value = null
     connected.value = false

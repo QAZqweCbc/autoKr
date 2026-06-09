@@ -61,7 +61,9 @@ export function accountToFlat(account: Account): AccountFlatDB {
     status: account.status ?? null,
     last_error: account.lastError ?? null,
     consecutive_failures: account.consecutiveFailures ?? 0,
-    is_active: account.isActive ?? (account.status === 'active'),
+    is_active: typeof account.isActive === 'boolean'
+      ? account.isActive
+      : account.status === 'active',
     device_id: account.deviceId ?? null,
     assigned_at: account.assignedAt ?? null,
     created_at: account.createdAt,

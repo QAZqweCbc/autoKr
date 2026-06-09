@@ -573,13 +573,14 @@ async function getBrowserVersion(browserPath: string, browserType: 'chrome' | 'f
     // Firefox 使用 --version 或 -v
     const versionFlag = browserType === 'chrome' ? '--version' : '--version'
     
-    const { stdout } = await execFileAsync(browserPath, [versionFlag], {
+    const { stdout, stderr } = await execFileAsync(browserPath, [versionFlag], {
       timeout: 5000 // 5秒超时
     })
     
-    // 提取版本号（通常格式为 "Chromium 120.0.6099.109" 或 "Mozilla Firefox 121.0"）
-    const match = stdout.trim().match(/[\d.]+/)
-    return match ? match[0] : stdout.trim()
+    // 只返回数字版本，避免 Windows 本地化输出或乱码前缀进入前端展示
+    const output = `${stdout || ''}\n${stderr || ''}`
+    const match = output.match(/\b\d+(?:\.\d+){1,3}\b/)
+    return match ? match[0] : undefined
   } catch (error) {
     // 无法获取版本，返回 undefined
     return undefined

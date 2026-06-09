@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+﻿import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
@@ -9,7 +9,6 @@ import App from './App.vue'
 import router from './router'
 import './styles/responsive-utilities.css'
 import './styles/enhancements.css'
-import { useWebSocketStore } from './stores/websocket'
 
 const app = createApp(App)
 
@@ -25,6 +24,3 @@ app.use(ElementPlus)
 
 app.mount('#app')
 
-// 初始化 WebSocket 连接
-const wsStore = useWebSocketStore()
-wsStore.connect()
