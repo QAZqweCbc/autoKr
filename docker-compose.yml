@@ -1,0 +1,38 @@
+services:
+  kiro:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: kiro-account-manager:local
+    restart: unless-stopped
+    ports:
+      - "${KIRO_PORT:-14558}:14558"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      NODE_ENV: production
+      PORT: 14558
+      AUTH_PORT: 2233
+      AUTH_SERVICE_URL: http://127.0.0.1:2233
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:14558,http://127.0.0.1:14558}
+      DATABASE_STORAGE: ${DATABASE_STORAGE:-mysql}
+      MYSQL_HOST: ${MYSQL_HOST:-host.docker.internal}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_USER: ${MYSQL_USER:-kiro}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-KrioServer}
+      REDIS_HOST: ${REDIS_HOST:-host.docker.internal}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      KIRO_AUTO_SETUP_FROM_ENV: ${KIRO_AUTO_SETUP_FROM_ENV:-true}
+    volumes:
+      - kiro_config:/app/config
+      - kiro_data:/app/data
+      - kiro_logs:/app/logs
+
+volumes:
+  kiro_config:
+  kiro_data:
+  kiro_logs:
