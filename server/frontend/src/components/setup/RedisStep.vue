@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { saveDatabaseConfig, testConnection, getDatabaseConfig } from '../../api/databaseConfig'
 
@@ -59,6 +59,22 @@ const form = ref({
 const testing = ref(false)
 const tested = ref(false)
 const errorMessage = ref('')
+
+onMounted(async () => {
+  try {
+    const result = await getDatabaseConfig()
+    if (result.success && result.config?.redis) {
+      form.value = {
+        host: result.config.redis.host || 'localhost',
+        port: result.config.redis.port || 6379,
+        password: result.config.redis.password === '******' ? '' : result.config.redis.password || '',
+        db: result.config.redis.db ?? 0
+      }
+    }
+  } catch {
+    // 保留默认值，避免阻塞配置向导
+  }
+})
 
 const handleTest = async () => {
   testing.value = true

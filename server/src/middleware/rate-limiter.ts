@@ -6,13 +6,16 @@
 import rateLimit from 'express-rate-limit'
 import { logger } from '../utils/logger'
 
+const API_LIMIT_WINDOW_MS = Number(process.env.API_LIMIT_WINDOW_MS || 15 * 60 * 1000)
+const API_LIMIT_MAX = Number(process.env.API_LIMIT_MAX || 1000)
+
 /**
  * 通用 API 限流
  * 15分钟内最多 100 个请求
  */
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15分钟
-  max: 100,
+  max: API_LIMIT_MAX,
   message: {
     error: '请求过于频繁，请稍后再试',
     retryAfter: '15分钟'

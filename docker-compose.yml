@@ -27,6 +27,7 @@ services:
       REDIS_DB: ${REDIS_DB:-0}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       KIRO_AUTO_SETUP_FROM_ENV: ${KIRO_AUTO_SETUP_FROM_ENV:-true}
+      API_LIMIT_MAX: ${API_LIMIT_MAX:-1000}
     volumes:
       - kiro_config:/app/config
       - kiro_data:/app/data

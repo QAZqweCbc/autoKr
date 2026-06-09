@@ -178,12 +178,6 @@ app.get('/api/system/health', (req, res) => {
   res.json({ success: true, data: status })
 })
 
-// API 限流
-app.use('/api', apiLimiter)
-
-// 主 API 路由（必须在 /api 限流之后）
-app.use('/api', apiRoutes)
-
 // 配置向导 API 路由（必须在静态文件之前）
 import setupRoutes from './routes/setup.routes'
 app.use('/api/setup', setupRoutes)
@@ -191,6 +185,12 @@ app.use('/api/setup', setupRoutes)
 // 数据库配置 API 路由
 import databaseConfigRoutes from './routes/database-config.routes'
 app.use('/api/database', databaseConfigRoutes)
+
+// API 限流
+app.use('/api', apiLimiter)
+
+// 主 API 路由（必须在 /api 限流之后）
+app.use('/api', apiRoutes)
 
 
 // 代理认证服务请求到端口 2233

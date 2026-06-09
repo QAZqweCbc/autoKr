@@ -44,9 +44,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { saveDatabaseConfig, testConnection } from '../../api/databaseConfig'
+import { getDatabaseConfig, saveDatabaseConfig, testConnection } from '../../api/databaseConfig'
 
 const emit = defineEmits<{ next: [boolean]; skip: [] }>()
 
@@ -56,6 +56,23 @@ const tested = ref(false)
 const errorMessage = ref('')
 
 const canTest = computed(() => form.value.host && form.value.user)
+
+onMounted(async () => {
+  try {
+    const result = await getDatabaseConfig()
+    if (result.success && result.config?.mysql) {
+      form.value = {
+        host: result.config.mysql.host || 'localhost',
+        port: result.config.mysql.port || 3306,
+        user: result.config.mysql.user || 'root',
+        password: result.config.mysql.password === '******' ? '' : result.config.mysql.password || '',
+        database: result.config.mysql.database || 'KrioServer'
+      }
+    }
+  } catch {
+    // 保留默认值，避免阻塞配置向导
+  }
+})
 
 const handleTest = async () => {
   testing.value = true
