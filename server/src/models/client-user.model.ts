@@ -11,6 +11,9 @@ export interface ClientUser {
   max_tokens: number
   created_at: number
   last_login_at?: number
+  registration_status?: 'pending' | 'in_progress' | 'completed'
+  pending_delete?: boolean
+  registration_started_at?: number
 }
 
 export interface ClientUserCreateDTO {

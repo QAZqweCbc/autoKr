@@ -89,7 +89,17 @@ async function executeTask(task: Task) {
       console.log(`[${task.email}] ${message}`)
       emitTaskLog(task.id, message)
     }
-    
+    // 📋 显示注册信息摘要
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    log('📝 注册账户信息')
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    log(`📧 注册账号: ${task.email}`)
+    log(`🔑 账号密码: ${task.password}`)
+    if (task.proxy_url) {
+      log(`🌐 代理设置: ${task.proxy_url}`)
+    }
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+
     // 🔄 动态加载 autoRegisterAWS
     log('正在加载注册模块...')
     const autoRegisterAWS = await getAutoRegisterAWS()
@@ -112,20 +122,24 @@ async function executeTask(task: Task) {
     
     // 🔧 应用 Linux 优化
     const optimizedConfig = applyLinuxOptimizations(browserConfig)
-    
+
     // 📝 记录浏览器配置详情
-    log(`浏览器类型: ${optimizedConfig.browserType}`)
-    log(`运行模式: ${optimizedConfig.headless ? 'headless' : 'headed'}`)
-    log(`启动参数数量: ${optimizedConfig.args.length}`)
-    log(`延迟范围: ${optimizedConfig.delayMin}s - ${optimizedConfig.delayMax}s`)
-    
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    log('🌐 浏览器配置')
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    log(`🖥️  浏览器类型: ${optimizedConfig.browserType}`)
+    log(`👁️  运行模式: ${optimizedConfig.headless ? 'headless (无界面)' : 'headed (有界面)'}`)
+    log(`⚙️  启动参数: ${optimizedConfig.args.length} 个`)
+    log(`⏱️  延迟范围: ${optimizedConfig.delayMin}s - ${optimizedConfig.delayMax}s`)
+
     if (optimizedConfig.browserPath) {
-      log(`自定义浏览器路径: ${optimizedConfig.browserPath}`)
+      log(`📂 自定义路径: ${optimizedConfig.browserPath}`)
     }
-    
+
     if (envInfo.isRoot && optimizedConfig.args.includes('--no-sandbox')) {
-      log('✓ 已添加 root 用户安全参数 (--no-sandbox)')
+      log('✓ 已添加 root 用户安全参数')
     }
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
     
     // 🔄 执行注册
     log('开始执行注册流程...')
@@ -142,6 +156,15 @@ async function executeTask(task: Task) {
     const authCodePreview = emailConfig.authCode ? emailConfig.authCode.substring(0, 4) + '****' : '(空)'
     log(`✅ 邮箱配置加载成功: ${emailConfig.qqEmail}`)
     log(`📝 授权码预览: ${authCodePreview} (长度: ${emailConfig.authCode?.length || 0})`)
+
+    // 📧 显示邮箱验证信息
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    log('📮 邮箱验证配置')
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    log(`📬 接收邮箱: ${receiveEmail || emailConfig.qqEmail}`)
+    log(`🔐 邮箱密码: ${'*'.repeat(task.password.length)} (与账号密码相同)`)
+    log(`🎫 授权码: ${authCodePreview}`)
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
     // 检查授权码是否可用
     if (!emailConfig.authCode || emailConfig.authCode === '******' || emailConfig.authCode.includes('*') || emailConfig.authCode.trim() === '') {
