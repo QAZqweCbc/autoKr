@@ -75,7 +75,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
 
     socket.value.on('registration:success', (data: any) => {
       const message = `✅ 注册成功 - 邮箱: ${data.email}, 密码: ${data.password}${data.name ? `, 姓名: ${data.name}` : ''}`
-      addStructuredLog('account', '', message, '账号注册')
+      addStructuredLog('account', 'success', message, '账号注册')
     })
 
     socket.value.on('registration:failure', (data: any) => {
