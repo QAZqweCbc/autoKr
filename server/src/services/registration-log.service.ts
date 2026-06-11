@@ -9,8 +9,10 @@ export interface RegistrationLog {
   id?: string
   task_id: string
   email: string
+  password?: string  // 账号密码
+  name?: string      // 注册姓名
   status: 'success' | 'failed'
-  
+
   // 注册结果信息
   sso_token?: string
   access_token?: string
@@ -18,7 +20,7 @@ export interface RegistrationLog {
   client_id?: string
   client_secret?: string
   region?: string
-  
+
   // 账号信息
   user_id?: string
   nickname?: string
@@ -60,8 +62,10 @@ export async function createRegistrationLogTable() {
         id VARCHAR(36) PRIMARY KEY COMMENT '日志ID',
         task_id VARCHAR(36) NOT NULL COMMENT '任务ID',
         email VARCHAR(255) NOT NULL COMMENT '注册邮箱',
+        password VARCHAR(255) COMMENT '账号密码',
+        name VARCHAR(255) COMMENT '注册姓名',
         status ENUM('success', 'failed') NOT NULL COMMENT '注册状态',
-        
+
         -- 注册结果信息
         sso_token TEXT COMMENT 'SSO Token',
         access_token TEXT COMMENT 'Access Token',
@@ -69,7 +73,7 @@ export async function createRegistrationLogTable() {
         client_id VARCHAR(255) COMMENT 'Client ID',
         client_secret TEXT COMMENT 'Client Secret',
         region VARCHAR(50) COMMENT '区域',
-        
+
         -- 账号信息
         user_id VARCHAR(255) COMMENT '用户ID',
         nickname VARCHAR(255) COMMENT '昵称',
@@ -118,17 +122,19 @@ export async function logRegistration(log: RegistrationLog): Promise<void> {
   
   try {
     await connection.execute(
-      `INSERT INTO registration_logs 
-       (id, task_id, email, status, sso_token, access_token, refresh_token, 
+      `INSERT INTO registration_logs
+       (id, task_id, email, password, name, status, sso_token, access_token, refresh_token,
         client_id, client_secret, region, user_id, nickname, idp,
-        subscription_type, subscription_title, subscription_status, 
+        subscription_type, subscription_title, subscription_status,
         days_remaining, expires_at, usage_current, usage_limit, usage_percent,
         browser_type, headless, proxy_url, duration, error_message, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         log.id,
         log.task_id,
         log.email,
+        log.password || null,
+        log.name || null,
         log.status,
         log.sso_token || null,
         log.access_token || null,

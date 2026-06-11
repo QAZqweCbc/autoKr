@@ -11,6 +11,7 @@ import { emitTaskUpdate, emitTaskLog, emitAccountUpdate } from '../websocket/soc
 import { loadBrowserConfig, applyLinuxOptimizations, getEnvironmentInfo } from './config.service'
 import { getEmailConfigForInternal } from './email-config-manager.service'
 import { syncAccountUsage } from './kiro-api.service'
+import { logRegistration } from './registration-log.service'
 
 // 当前正在执行的任务数
 let runningTasks = 0
@@ -293,15 +294,57 @@ async function executeTask(task: Task) {
       // 更新任务状态
       await TaskDB.updateStatus(task.id, 'success')
       emitTaskUpdate(task.id, 'success')
-      
+
+      // 📝 记录注册成功日志
+      try {
+        await logRegistration({
+          id: uuidv4(),
+          task_id: task.id,
+          email: task.email,
+          password: task.password,
+          name: result.name,
+          status: 'success',
+          sso_token: result.ssoToken,
+          access_token: result.accessToken,
+          refresh_token: result.refreshToken,
+          client_id: result.clientId,
+          client_secret: result.clientSecret,
+          browser_type: optimizedConfig.browserType,
+          headless: optimizedConfig.headless,
+          proxy_url: task.proxy_url,
+          created_at: Date.now()
+        })
+      } catch (logError: any) {
+        console.error('记录注册日志失败:', logError.message)
+      }
+
     } else {
       // 注册失败
       const error = result.error || '未知错误'
       console.error(`❌ 注册失败 [${task.email}]: ${error}`)
       log(`❌ 注册失败: ${error}`)
-      
+
       await TaskDB.updateStatus(task.id, 'failed', error)
       emitTaskUpdate(task.id, 'failed', error)
+
+      // 📝 记录注册失败日志
+      try {
+        await logRegistration({
+          id: uuidv4(),
+          task_id: task.id,
+          email: task.email,
+          password: task.password,
+          name: result.name,
+          status: 'failed',
+          error_message: error,
+          browser_type: optimizedConfig.browserType,
+          headless: optimizedConfig.headless,
+          proxy_url: task.proxy_url,
+          created_at: Date.now()
+        })
+      } catch (logError: any) {
+        console.error('记录注册日志失败:', logError.message)
+      }
     }
     
   } catch (error: any) {
