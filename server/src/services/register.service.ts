@@ -181,7 +181,7 @@ async function executeTask(task: Task) {
     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
     log(`📬 接收邮箱: ${receiveEmail}`)
     log(`🔐 邮箱密码: ${'*'.repeat(task.password.length)} (与账号密码相同)`)
-    log(`🎫 授权码: ${iew}`)
+    log(`🎫 授权码: ${authCode}`)
     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
     
     const result = await autoRegisterAWS(

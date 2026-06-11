@@ -1168,20 +1168,120 @@ async function waitAndClickWithRetry(
   maxRetries: number = 3
 ): Promise<boolean> {
   log(`等待${description}出现...`)
-  try {
-    const element = page.locator(selector).first()
-    await element.waitFor({ state: 'visible', timeout })
-    await page.waitForTimeout(500)
-    await element.click()
-    log(`✓ 已点击${description}`)
-    
-    // 检查是否有错误弹窗，如果有则重试
-    const success = await checkAndRetryOnError(page, selector, log, description, maxRetries)
-    return success
-  } catch (error) {
-    log(`✗ 点击${description}失败: ${error}`)
-    return false
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const element = page.locator(selector).first()
+
+      // 等待元素可见
+      await element.waitFor({ state: 'visible', timeout })
+      log(`✓ ${description}已可见`)
+
+      // 🔍 调试信息：检查按钮状态
+      const isVisible = await element.isVisible()
+      const isEnabled = await element.isEnabled()
+      const boundingBox = await element.boundingBox()
+
+      log(`🔍 调试信息 - ${description}:`)
+      log(`   - 可见性: ${isVisible}`)
+      log(`   - 启用状态: ${isEnabled}`)
+      log(`   - 位置: ${boundingBox ? `x:${boundingBox.x}, y:${boundingBox.y}, w:${boundingBox.width}, h:${boundingBox.height}` : '无法获取'}`)
+
+      // 如果按钮未启用，等待其启用
+      if (!isEnabled) {
+        log(`⚠️ ${description}当前处于禁用状态，等待启用...`)
+        try {
+          await element.waitFor({ state: 'attached', timeout: 10000 })
+          // 轮询检查按钮是否启用
+          for (let i = 0; i < 20; i++) {
+            const nowEnabled = await element.isEnabled()
+            if (nowEnabled) {
+              log(`✓ ${description}已启用`)
+              break
+            }
+            await page.waitForTimeout(500)
+          }
+        } catch (e) {
+          log(`⚠️ 等待按钮启用超时: ${e}`)
+        }
+      }
+
+      // 再次检查启用状态
+      const finalEnabled = await element.isEnabled()
+      if (!finalEnabled) {
+        log(`⚠️ ${description}仍处于禁用状态，但仍尝试点击`)
+      }
+
+      // 等待一下再点击
+      await page.waitForTimeout(500)
+
+      // 点击按钮
+      await element.click()
+      log(`✓ 已点击${description}`)
+
+      // 检查是否有错误弹窗，如果有则重试
+      const success = await checkAndRetryOnError(page, selector, log, description, maxRetries)
+      if (success) {
+        return true
+      }
+
+      // 如果有错误，继续下一次尝试
+      if (attempt < maxRetries - 1) {
+        log(`⚠️ 点击${description}后出现错误，准备第 ${attempt + 2} 次尝试...`)
+        await page.waitForTimeout(2000)
+      }
+
+    } catch (error) {
+      log(`✗ 第 ${attempt + 1} 次点击${description}失败: ${error}`)
+
+      // 📸 失败时截图
+      try {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+        const screenshotPath = `debug-click-failed-${description.replace(/[^a-zA-Z0-9]/g, '_')}-${timestamp}.png`
+        await page.screenshot({ path: screenshotPath, fullPage: true })
+        log(`📸 已保存失败截图: ${screenshotPath}`)
+      } catch (screenshotError) {
+        log(`⚠️ 截图失败: ${screenshotError}`)
+      }
+
+      // 📋 记录页面 HTML 结构
+      try {
+        const pageHTML = await page.content()
+        const htmlSnippet = pageHTML.substring(0, 2000)
+        log(`📋 页面 HTML 片段 (前2000字符):`)
+        log(htmlSnippet)
+
+        // 检查目标元素是否存在
+        const elementCount = await page.locator(se.count()
+        log(`🔍 选择器 "${selector}" 匹配到 ${elementCount} 个元素`)
+
+        if (elementCount > 0) {
+          // 尝试获取元素的外层 HTML
+          try {
+            const outerHTML = await page.locator(selector).first().evaluate(el => el.outerHTML)
+            log(`🔍 目标元素 HTML: ${outerHTML}`)
+          } catch (e) {
+            log(`⚠️ 无法获取元素 HTML: ${e}`)
+          }
+        }
+      } catch (htmlError) {
+        log(`⚠️ 获取页面 HTML 失败: ${htmlError}`)
+      }
+
+      // 如果还有重试机会，继续尝试
+      if (attempt < maxRetries - 1) {
+        log(`⏳ 等待 3 秒后进行第 ${attempt + 2} 次尝试...`)
+        await page.waitForTimeout(3000)
+        continue
+      }
+
+      // 所有尝试都失败
+      return false
+    }
   }
+
+  log(`✗ ${description}经过 ${maxRetries} 次尝试后仍然失败`)
+  return false
 }
 
 /**
