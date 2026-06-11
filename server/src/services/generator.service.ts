@@ -112,16 +112,19 @@ function generateRealisticUsername(targetLength?: number): string {
   return username
 }
 
-// 生成随机邮箱
-function generateRandomEmail(domains: string[], emailLength?: number): string {
+// 生成随机邮箱（确保域名均匀分布）
+function generateRandomEmail(domains: string[], emailLength?: number, index?: number): string {
   const username = generateRealisticUsername(emailLength)
-  
-  // 从域名列表中随机选择一个
-  const domain = domains[Math.floor(Math.random() * domains.length)]
-  
+
+  // 如果提供了索引，按索引轮转选择域名，确保均匀分布
+  // 否则回退到随机选择（向后兼容）
+  const domain = (index !== undefined && index >= 0 && index < domains.length)
+    ? domains[index]
+    : domains[Math.floor(Math.random() * domains.length)]
+
   // 移除域名开头的 @ 符号（如果有）
   const cleanDomain = domain.startsWith('@') ? domain.slice(1) : domain
-  
+
   return `${username}@${cleanDomain}`
 }
 
@@ -162,7 +165,7 @@ export function generateAccounts(dto: GenerateAccountDTO): GenerateResult {
     
     for (let i = 0; i < count; i++) {
       const account: GeneratedAccount = {
-        email: generateRandomEmail(domains, email_length),
+        email: generateRandomEmail(domains, email_length, i),
         password: generateRandomString(password_length, true)
       }
       
