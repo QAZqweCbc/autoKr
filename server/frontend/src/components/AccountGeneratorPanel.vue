@@ -313,7 +313,6 @@ const handleCreateTasks = async () => {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-bottom: 12px;
   }
 
   .domain-stat-item {
@@ -322,6 +321,7 @@ const handleCreateTasks = async () => {
     gap: 6px;
     font-size: 13px;
     color: var(--text-primary);
+    flex: 0 0 auto;
   }
 }
 
