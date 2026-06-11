@@ -162,10 +162,16 @@ export function generateAccounts(dto: GenerateAccountDTO): GenerateResult {
     }
     
     const accounts: GeneratedAccount[] = []
-    
+    const domainUsage: Record<string, number> = {}
+
     for (let i = 0; i < count; i++) {
+      const email = generateRandomEmail(domains, email_length, i)
+      // 提取域名用于统计
+      const domain = email.split('@')[1]
+      domainUsage[domain] = (domainUsage[domain] || 0) + 1
+
       const account: GeneratedAccount = {
-        email: generateRandomEmail(domains, email_length, i),
+        email,
         password: generateRandomString(password_length, true)
       }
       
@@ -179,7 +185,8 @@ export function generateAccounts(dto: GenerateAccountDTO): GenerateResult {
     return {
       success: true,
       accounts,
-      count: accounts.length
+      count: accounts.length,
+      domainUsage
     }
   } catch (error: any) {
     console.error('❌ 生成账号失败:', error.message)

@@ -59,6 +59,14 @@
         </div>
       </template>
 
+      <!-- 域名使用统计 -->
+      <div class="domain-stats">
+        <div v-for="count in Object.entries(generatorStore.domainUsage)" :key="count[0]" class="domain-stat-item">
+          <span class="stat-domain">{{ count[0] }}</span>
+          <el-tag type="info" size="small">{{ count[1] }} 次</el-tag>
+        </div>
+      </div>
+
       <el-table :data="generatorStore.accounts" stripe>
         <el-table-column type="index" label="序号" width="70" />
         <el-table-column prop="email" label="邮箱" min-width="220" />
@@ -299,6 +307,21 @@ const handleCreateTasks = async () => {
 
   .generator-controls {
     grid-template-columns: 1fr;
+  }
+
+  .domain-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .domain-stat-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-primary);
   }
 }
 

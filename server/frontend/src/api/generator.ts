@@ -23,6 +23,7 @@ export const generateAccounts = async (data: GenerateRequest) => {
     success: boolean
     accounts: GeneratedAccount[]
     count: number
+    domainUsage?: Record<string, number>
     error?: string
   }>('/generator', data)
   return response

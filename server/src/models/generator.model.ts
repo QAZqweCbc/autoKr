@@ -21,4 +21,5 @@ export interface GenerateResult {
   success: boolean
   accounts: GeneratedAccount[]
   count: number
+  domainUsage?: Record<string, number>  // 域名使用次数统计
 }
