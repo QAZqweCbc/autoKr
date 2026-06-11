@@ -3,7 +3,8 @@
  */
 
 import { Request, Response } from 'express'
-import { 
+import path from 'path'
+import {
   createCheckRecord, 
   getAllCheckRecords, 
   getCheckRecordById, 
@@ -57,16 +58,20 @@ async function getIPCheckModule() {
     mockElectronModule()
     
     // 尝试加载编译后的文件（优先）
+    const baseDir = path.resolve(__dirname, '../..')
+    const compiledPath = path.join(baseDir, 'main', 'ipCheck')
+    const sourcePath = path.join(baseDir, 'src', 'main', 'ipCheck')
+
     let ipCheckModule
     try {
       // 首先尝试加载编译后的 JS 文件
-      ipCheckModule = require('../../../out/main/ipCheck')
+      ipCheckModule = require(compiledPath)
       console.log('✅ 成功加载编译后的 ipCheck 模块')
     } catch (outError: any) {
       // 如果编译后的文件不存在，尝试加载源文件（开发环境）
       console.log('⚠️  编译后的文件加载失败:', outError.message)
       console.log('⚠️  尝试加载源文件...')
-      ipCheckModule = require('../../../src/main/ipCheck')
+      ipCheckModule = require(sourcePath)
       console.log('✅ 成功加载源文件 ipCheck 模块')
     }
     
