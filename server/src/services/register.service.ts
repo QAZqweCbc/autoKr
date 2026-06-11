@@ -157,15 +157,6 @@ async function executeTask(task: Task) {
     log(`✅ 邮箱配置加载成功: ${emailConfig.qqEmail}`)
     log(`📝 授权码预览: ${authCodePreview} (长度: ${emailConfig.authCode?.length || 0})`)
 
-    // 📧 显示邮箱验证信息
-    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    log('📮 邮箱验证配置')
-    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    log(`📬 接收邮箱: ${receiveEmail || emailConfig.qqEmail}`)
-    log(`🔐 邮箱密码: ${'*'.repeat(task.password.length)} (与账号密码相同)`)
-    log(`🎫 授权码: ${authCodePreview}`)
-    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-
     // 检查授权码是否可用
     if (!emailConfig.authCode || emailConfig.authCode === '******' || emailConfig.authCode.includes('*') || emailConfig.authCode.trim() === '') {
       throw new Error(
@@ -183,6 +174,15 @@ async function executeTask(task: Task) {
     // 使用配置中的授权码，而不是任务表中的
     const authCode = emailConfig.authCode
     const receiveEmail = task.receive_email || emailConfig.qqEmail
+
+    // 📧 显示邮箱验证信息
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    log('📮 邮箱验证配置')
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    log(`📬 接收邮箱: ${receiveEmail}`)
+    log(`🔐 邮箱密码: ${'*'.repeat(task.password.length)} (与账号密码相同)`)
+    log(`🎫 授权码: ${iew}`)
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
     
     const result = await autoRegisterAWS(
       task.email,
