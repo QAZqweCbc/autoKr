@@ -85,12 +85,12 @@ async function executeTask(task: Task) {
       console.log(`[${task.email}] ${message}`)
       emitTaskLog(task.id, message)
     }
-    // 📋 显示注册信息摘要
+    // 📋 显示注册信息摘要（归入注册账户日志）
     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    log('📝 注册账户信息')
+    emitTaskLog(task.id, '📝 注册账户信息', { type: 'account' })
     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    log(`📧 注册账号: ${task.email}`)
-    log(`🔑 账号密码: ${task.password}`)
+    emitTaskLog(task.id, `📧 注册账号: ${task.email}`, { type: 'account' })
+    emitTaskLog(task.id, `🔑 账号密码: ${task.password}`, { type: 'account' })
     if (task.proxy_url) {
       log(`🌐 代理设置: ${task.proxy_url}`)
     }

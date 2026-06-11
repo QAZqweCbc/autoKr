@@ -66,19 +66,36 @@ export function emitAccountUpdate() {
 
 /**
  * 发送任务日志
+ * @param taskId 任务ID
+ * @param message 消息内容
+ * @param options 可选配置
+ * @param options.type 日志分类：'register'(默认任务日志) | 'account'(账号相关) | 'config'(配置相关)
  */
-export function emitTaskLog(taskId: string, message: string) {
+export function emitTaskLog(
+  taskId: string,
+  message: string,
+  options?: { type?: 'register' | 'account' | 'config' }
+) {
   if (!io) return
-  
-  const payload = {
+
+  const payload: {
+    taskId: string
+    message: string
+    timestamp: number
+    type?: 'register' | 'account' | 'config'
+  } = {
     taskId,
     message,
     timestamp: Date.now()
   }
-  
+
+  if (options?.type) {
+    payload.type = options.type
+  }
+
   // 实时日志页默认不订阅单个任务，所以任务日志需要全局广播
   io.emit('task:log', payload)
-  
+
   // 兼容旧客户端监听 log 事件
   io.emit('log', payload)
 }

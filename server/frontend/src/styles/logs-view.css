@@ -87,6 +87,70 @@
   font-size: 13px;
 }
 
+/* ========== 注册账户日志：账号信息区块 ========== */
+.account-section {
+  margin-bottom: 16px;
+}
+
+.account-block {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #fff;
+}
+
+.block-title {
+  background: var(--primary-soft);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.block-divider {
+  border-top: 1px solid var(--border-color);
+}
+
+/* 表格行布局 */
+.table-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.table-cell {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  border-right: 1px solid var(--border-color);
+}
+
+.table-cell:last-child {
+  border-right: none;
+}
+
+.table-cell.col-span-2 {
+  grid-column: span 2;
+}
+
+.table-cell[colspan="6"] {
+  grid-column: span 6;
+}
+
+/* 信息模块 */
+.account-info-module {
+  margin-top: 4px;
+}
+
+.section-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  padding-left: 8px;
+  border-left: 3px solid var(--el-color-primary);
+}
+
 @media (max-width: 767px) {
   .logs-header,
   .logs-title-group,

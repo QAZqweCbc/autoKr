@@ -23,7 +23,9 @@ import { useWebSocketStore } from './stores/websocket'
 import { checkSetupStatus } from './api/setup'
 
 const wsStore = useWebSocketStore()
-const setupCompleted = ref(false)
+// 默认假设配置已完成，避免每次刷新向导都闪现
+// API 返回后会根据实际状态修正
+const setupCompleted = ref(true)
 
 let sidebarObserver: MutationObserver | null = null
 

@@ -5,6 +5,36 @@ import { io, Socket } from 'socket.io-client'
 export type LogCategory = 'register' | 'config' | 'account' | 'connection'
 export type LogLevel = 'info' | 'success' | 'warning' | 'error'
 
+/** 账户注册成功事件的结构化数据 */
+export interface AccountSuccessPayload {
+  type: 'registration_success'
+  email: string
+  password: string
+  name?: string
+  ssoToken?: string
+  taskId?: string
+}
+
+/** 账户注册失败事件的结构化数据 */
+export interface AccountFailurePayload {
+  type: 'registration_failure'
+  email: string
+  password: string
+  name?: string
+  error: string
+  taskId?: string
+}
+
+/** 账户刷新事件的结构化数据 */
+export interface AccountRefreshPayload {
+  type: 'refresh'
+  email: string
+  success?: boolean
+  error?: string
+}
+
+export type AccountLogPayload = AccountSuccessPayload | AccountFailurePayload | AccountRefreshPayload
+
 export interface WsLogEntry {
   id: string
   time: string
@@ -12,6 +42,8 @@ export interface WsLogEntry {
   category: LogCategory
   level: LogLevel
   source: string
+  /** 结构化载荷，用于账户日志的结构化展示 */
+  payload?: AccountLogPayload
 }
 
 export const useWebSocketStore = defineStore('websocket', () => {
@@ -25,6 +57,23 @@ export const useWebSocketStore = defineStore('websocket', () => {
     account: logs.value.filter(log => log.category === 'account'),
     connection: logs.value.filter(log => log.category === 'connection')
   }))
+
+  // 注册账户日志专用：区分账号信息（有 payload 的成功/信息日志）和错误日志
+  const accountInfoLogs = computed(() =>
+    logs.value.filter(
+      log =>
+        log.category === 'account' &&
+        (log.payload?.type === 'registration_success' || log.payload?.type === 'refresh')
+    )
+  )
+
+  const accountErrorLogs = computed(() =>
+    logs.value.filter(
+      log =>
+        log.category === 'account' &&
+        (log.level === 'error' || log.payload?.type === 'registration_failure')
+    )
+  )
 
   const connect = () => {
     if (socket.value) return
@@ -52,8 +101,10 @@ export const useWebSocketStore = defineStore('websocket', () => {
       addDerivedLog(data.message, '系统日志')
     })
 
-    socket.value.on('task:log', (data: { taskId: string; message: string }) => {
-      addStructuredLog('register', 'info', `[${data.taskId}] ${data.message}`, '任务日志')
+    socket.value.on('task:log', (data: { taskId: string; message: string; type?: 'register' | 'account' | 'config' }) => {
+      const category = data.type || 'register'
+      const level = data.type === 'account' ? 'info' : detectLevel(data.message)
+      addStructuredLog(category, level, `[${data.taskId}] ${data.message}`, '任务日志')
     })
 
     socket.value.on('system:message', (data: { message: string; level?: string }) => {
@@ -75,12 +126,25 @@ export const useWebSocketStore = defineStore('websocket', () => {
 
     socket.value.on('registration:success', (data: any) => {
       const message = `✅ 注册成功 - 邮箱: ${data.email}, 密码: ${data.password}${data.name ? `, 姓名: ${data.name}` : ''}`
-      addStructuredLog('account', 'success', message, '账号注册')
+      addStructuredLog('account', 'success', message, '账号注册', {
+        type: 'registration_success',
+        email: data.email,
+        password: data.password,
+        name: data.name,
+        taskId: data.taskId
+      })
     })
 
     socket.value.on('registration:failure', (data: any) => {
       const message = `❌ 注册失败 - 邮箱: ${data.email}, 密码: ${data.password}${data.name ? `, 姓名: ${data.name}` : ''}, 原因: ${data.error}`
-      addStructuredLog('account', 'error', message, '账号注册')
+      addStructuredLog('account', 'error', message, '账号注册', {
+        type: 'registration_failure',
+        email: data.email,
+        password: data.password,
+        name: data.name,
+        error: data.error,
+        taskId: data.taskId
+      })
     })
 
     socket.value.on('refresh:start', (data: any) => {
@@ -90,7 +154,12 @@ export const useWebSocketStore = defineStore('websocket', () => {
     socket.value.on('refresh:account', (data: any) => {
       const level: LogLevel = data.success === false ? 'warning' : 'success'
       const details = data.error ? `，原因：${data.error}` : ''
-      addStructuredLog('account', level, `账号刷新完成：${data.email || '未知'}${details}`, 'Token 刷新')
+      addStructuredLog('account', level, `账号刷新完成：${data.email || '未知'}${details}`, 'Token 刷新', {
+        type: 'refresh',
+        email: data.email || '未知',
+        success: data.success,
+        error: data.error
+      })
     })
 
     socket.value.on('refresh:complete', (data: any) => {
@@ -109,14 +178,21 @@ export const useWebSocketStore = defineStore('websocket', () => {
     connected.value = false
   }
 
-  const addStructuredLog = (category: LogCategory, level: LogLevel, message: string, source: string) => {
+  const addStructuredLog = (
+    category: LogCategory,
+    level: LogLevel,
+    message: string,
+    source: string,
+    payload?: AccountLogPayload
+  ) => {
     logs.value.push({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       time: new Date().toLocaleTimeString('zh-CN'),
       message,
       category,
       level,
-      source
+      source,
+      payload
     })
 
     if (logs.value.length > 1000) {
@@ -131,8 +207,12 @@ export const useWebSocketStore = defineStore('websocket', () => {
 
   const detectCategory = (message: string): LogCategory => {
     if (/(WebSocket|连接|断开|重连|socket)/i.test(message)) return 'connection'
-    if (/(配置|保存|浏览器|邮箱|数据库|setup)/i.test(message)) return 'config'
-    if (/(注册|任务|验证码|创建任务|运行|暂停|恢复)/i.test(message)) return 'register'
+    if (/(配置|保存|浏览器|数据库|setup)/i.test(message)) return 'config'
+    // 账户相关优先匹配（包含"账号""注册账户""验证码"等）
+    if (/(账号|注册账户|验证码|凭证|Token|token)/i.test(message)) return 'account'
+    // 邮箱单独归入 config（不是注册）
+    if (/邮箱/i.test(message)) return 'config'
+    if (/(任务|创建任务|运行|暂停|恢复)/i.test(message)) return 'register'
     return 'account'
   }
 
@@ -164,6 +244,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
     connected,
     logs,
     categorizedLogs,
+    accountInfoLogs,
+    accountErrorLogs,
     connect,
     disconnect,
     clearLogs,
