@@ -14,7 +14,7 @@
     "delayMax": 8
   },
   "generator": {
-    "defaultCount": 4,
+    "defaultCount": 100,
     "defaultEmailLength": 8,
     "defaultPasswordLength": 12
   },

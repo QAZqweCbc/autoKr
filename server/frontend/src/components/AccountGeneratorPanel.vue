@@ -308,21 +308,21 @@ const handleCreateTasks = async () => {
   .generator-controls {
     grid-template-columns: 1fr;
   }
+}
 
-  .domain-stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
+.domain-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 
-  .domain-stat-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    color: var(--text-primary);
-    flex: 0 0 auto;
-  }
+.domain-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  flex: 0 0 auto;
 }
 
 @media (max-width: 1180px) and (min-width: 768px) {
