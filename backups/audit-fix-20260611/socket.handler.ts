@@ -150,7 +150,7 @@ export function emitRefreshAlert(alert: RefreshAlertEvent) {
 export function emitAdminRefreshRequests() {
   if (!io) return
   
-  io.emit('admin:refresh-requests', {
+  io.emit('admin:refresh:requests', {
     timestamp: Date.now()
   })
 }
@@ -161,7 +161,7 @@ export function emitAdminRefreshRequests() {
 export function emitAdminRefreshRevokeRequests() {
   if (!io) return
   
-  io.emit('admin:refresh-revoke-requests', {
+  io.emit('admin:refresh:revoke-requests', {
     timestamp: Date.now()
   })
 }
@@ -172,7 +172,7 @@ export function emitAdminRefreshRevokeRequests() {
 export function emitAdminRefreshAllocations() {
   if (!io) return
 
-  io.emit('admin:refresh-allocations', {
+  io.emit('admin:refresh:allocations', {
     timestamp: Date.now()
   })
 }

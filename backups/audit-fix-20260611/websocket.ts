@@ -56,10 +56,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
       addStructuredLog('register', 'info', `[${data.taskId}] ${data.message}`, '任务日志')
     })
 
-    socket.value.on('system:message', (data: { message: string; level?: string }) => {
-      const levelFromServer = data.level || 'info'
-      const icon = levelFromServer === 'error' ? '❌ ' : levelFromServer === 'warning' ? '⚠️ ' : 'ℹ️ '
-      addDerivedLog(`${icon}${data.message}`, '系统通知')
+    socket.value.on('system:message', (data: { message: string }) => {
+      addDerivedLog(data.message, '系统通知')
     })
 
     socket.value.on('task:update', (data: { taskId: string; status: string; error?: string }) => {
@@ -74,7 +72,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     })
 
     socket.value.on('registration:success', (data: any) => {
-      const message = `✅ 注册成功 - 邮箱: ${data.email}, 密码: ${data.password}${data.name ? `, 姓名: ${data.name}` : ''}`
+      const message = `✅ 注册成功 - 邮箱: ${data.email}, 密码: ${data.password}me ? `, 姓名: ${data.name}` : ''}`
       addStructuredLog('account', '', message, '账号注册')
     })
 

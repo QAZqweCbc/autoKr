@@ -265,6 +265,11 @@ async function start() {
       logger.info('📦 初始化账号删除日志表...')
       const { createDeletionLogTable } = await import('./services/account-deletion-log.service')
       await createDeletionLogTable()
+
+      // 初始化注册日志表
+      logger.info('📦 初始化注册日志表...')
+      const { createRegistrationLogTable } = await import('./services/registration-log.service')
+      await createRegistrationLogTable()
     } else {
       logger.info('ℹ️  跳过数据库初始化（配置未完成）')
     }

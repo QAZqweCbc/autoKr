@@ -20,8 +20,13 @@ let MAX_CONCURRENT = 3 // 最大并发数
 // 任务队列
 const taskQueue: Task[] = []
 
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
 /**
  * 设置最大并发数
+ */
 export function setMaxConcurrent(max: number) {
   if (max > 0 && max <= 10) {
     MAX_CONCURRENT = max
@@ -275,20 +280,12 @@ async function executeTask(task: Task) {
         }
         
         // 保存账号（基本信息或完整信息）
-        const createdAccount = await AccountDB.create(accountData)
+        await AccountDB.create(accountData)
         console.log(`💾 账号已保存到数据库`)
         log('💾 账号已保存')
-
+        
         // 通知前端账号列表已更新
         emitAccountUpdate()
-
-        // 注册成功后，检查是否有待分配的 pending 申请
-        try {
-          const { handleAccountGenerationComplete } = await import('./auto-approval.service')
-          await handleAccountGenerationComplete(createdAccount.id)
-        } catch (autoApprovalError: any) {
-          console.warn(`自动审批检查失败: ${autoApprovalError?.message || autoApprovalError}`)
-        }
       } catch (dbError: any) {
         console.error(`❌ 保存账号失败:`, dbError.message)
         log(`⚠️ 保存账号失败: ${dbError.message}`)
