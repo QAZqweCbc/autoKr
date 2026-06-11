@@ -1252,7 +1252,7 @@ async function waitAndClickWithRetry(
         log(htmlSnippet)
 
         // 检查目标元素是否存在
-        const elementCount = await page.locator(se.count()
+        const elementCount = await page.locator(selector).count()
         log(`🔍 选择器 "${selector}" 匹配到 ${elementCount} 个元素`)
 
         if (elementCount > 0) {
