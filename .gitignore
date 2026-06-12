@@ -24,6 +24,7 @@ Thumbs.db
 *.swp
 *.swo
 .kiro/
+server/.claude/settings.local.json
 *.patch
 
 # Lock files (optional, 根据团队需求决定)
