@@ -1,18 +1,28 @@
 # Dependencies
 node_modules/
+server/node_modules/
+server/frontend/node_modules/
 
 # Build output
 out/
 dist/
+server/dist/
+server/frontend/dist/
+server/public/
 
 # Logs
 *.log
 npm-debug.log*
+logs/
+server/logs/
 
 # Environment
 .env
 .env.local
 .env.*.local
+server/.env
+server/.db-init-state.json
+server/.setup-completed
 
 # OS
 .DS_Store
@@ -24,12 +34,19 @@ Thumbs.db
 *.swp
 *.swo
 .kiro/
-server/.claude/settings.local.json
+server/.kiro/
+server/.claude/
+server/.codegraph/
+server/.superpowers/
+server/.vscode/
+server/frontend/.vscode/
 *.patch
+*.bak
 
 # Lock files (optional, 根据团队需求决定)
 # package-lock.json
 
-node_modeules/
-server/.setup-completed
-docs
+backups/
+/docs/
+server/data/
+server/config/database.config.json
