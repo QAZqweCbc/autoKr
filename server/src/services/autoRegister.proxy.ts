@@ -1,6 +1,6 @@
 ﻿/**
  * autoRegister 代理模块
- * 运行时动态加载主项目的 autoRegister，避免编译时路径问题
+ * 运行时动态加载 server 内的 autoRegister，兼容源码和编译产物
  */
 
 import * as path from 'path'
@@ -99,11 +99,11 @@ function patchPlaywrightScreenshotPath(autoRegisterPath: string) {
 
   let playwrightPath: string | null = null
 
-  // 优先从项目根目录查找 playwright（server/node_modules/playwright 或主项目 node_modules）
+  // 优先从 autoRegister 所在目录和 server 目录查找 playwright
   const searchDirs = [
     path.dirname(autoRegisterPath),
     path.resolve(__dirname, '../..'),  // server 目录
-    path.resolve(__dirname, '../../..') // 项目根目录
+    path.resolve(__dirname, '../../..') // 兼容旧运行位置
   ]
 
   for (const dir of searchDirs) {
@@ -131,11 +131,35 @@ function patchPlaywrightScreenshotPath(autoRegisterPath: string) {
   console.log(`📸 调试截图目录: ${DEBUG_IMAGE_DIR}`)
 }
 
+function findServerDir(): string {
+  let currentDir = __dirname
+
+  for (let i = 0; i < 6; i++) {
+    const packagePath = path.join(currentDir, 'package.json')
+    if (fs.existsSync(packagePath)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf-8'))
+        if (pkg.name === 'kiro-account-server') {
+          return currentDir
+        }
+      } catch {
+        // package.json 读取失败时继续向上查找
+      }
+    }
+
+    const parentDir = path.dirname(currentDir)
+    if (parentDir === currentDir) {
+      break
+    }
+    currentDir = parentDir
+  }
+
+  return path.resolve(__dirname, '../..')
+}
+
 // 运行时动态导入，避免 TypeScript 编译时检查
 export async function getAutoRegisterAWS() {
-  // __dirname = server/src/services/
-  const serverDir = path.resolve(__dirname, '../../..')          // server/
-  const projectRootDir = path.resolve(__dirname, '../../../')    // kiroAuto/ (项目根目录)
+  const serverDir = findServerDir()
   const playwrightDir = path.join(serverDir, 'node_modules')     // server/node_modules/
 
   // 设置 NODE_PATH 让 require/import 能找到 playwright
@@ -150,30 +174,22 @@ export async function getAutoRegisterAWS() {
     (require as any).module?.Module?.initPaths()
   }
 
-  // 查找 out/main 目录中的 autoRegister 文件（可能带 hash）
-  const outMainDir = path.join(projectRootDir, 'out/main')
+  // 优先加载 server 编译产物，开发环境下回退到 TypeScript 源码
   let autoRegisterPath: string | null = null
+  const compiledAutoRegisterPath = path.join(serverDir, 'dist/main/autoRegister.js')
+  const sourceAutoRegisterPath = path.join(serverDir, 'src/main/autoRegister.ts')
 
-  try {
-    if (fs.existsSync(outMainDir)) {
-      const files = fs.readdirSync(outMainDir)
-      const autoRegisterFile = files.find(f => f.startsWith('autoRegister-') && f.endsWith('.js'))
-
-      if (autoRegisterFile) {
-        autoRegisterPath = path.join(outMainDir, autoRegisterFile)
-        console.log(`📦 找到编译后的 autoRegister 模块: ${autoRegisterFile}`)
-      }
-    }
-  } catch (error) {
-    console.error('查找编译文件失败:', error)
+  if (fs.existsSync(compiledAutoRegisterPath)) {
+    autoRegisterPath = compiledAutoRegisterPath
+    console.log('📦 找到 server 编译后的 autoRegister 模块')
   }
 
   if (!autoRegisterPath) {
     console.log('⚠️  未找到编译版本，尝试加载 TypeScript 源码...')
-    autoRegisterPath = path.join(projectRootDir, 'src/main/autoRegister.ts')
+    autoRegisterPath = sourceAutoRegisterPath
   }
 
-    const serverRequire = createRequire(path.join(serverDir, 'package.json'))
+  const serverRequire = createRequire(path.join(serverDir, 'package.json'))
   try {
     console.log(`📦 加载路径: ${autoRegisterPath}`)
     patchPlaywrightScreenshotPath(autoRegisterPath)
@@ -192,8 +208,8 @@ export async function getAutoRegisterAWS() {
       console.error("\n" + "=".repeat(60))
       console.error("无法直接加载 TypeScript 文件")
       console.error("=".repeat(60))
-      console.error("请执行以下命令编译主项目后重试：")
-      console.error("  cd D:\\\kiroAuto")
+      console.error("请执行以下命令编译 server 后重试：")
+      console.error("  cd D:\\kiroAuto\\server")
       console.error("  npm install && npm run build")
       console.error("=".repeat(60) + "\n")
       
@@ -206,7 +222,7 @@ export async function getAutoRegisterAWS() {
         console.error("ts-node 也未安装:", tsNodeError.message)
       }
       
-      throw new Error("请编译主项目后重试: npm run build")
+      throw new Error("请编译 server 后重试: npm run build")
     }
     
     // 判断是否为 playwright 缺失
@@ -230,16 +246,15 @@ export async function getAutoRegisterAWS() {
     console.error('='.repeat(60))
     console.error(`错误: ${error.message}`)
     console.error(`尝试加载路径: ${autoRegisterPath}`)
-    console.error(`项目根目录: ${projectRootDir}`)
+    console.error(`server 目录: ${serverDir}`)
     console.error('\n可能的原因：')
-    console.error('  1. 主项目未编译（out/main/ 目录为空）')
+    console.error('  1. server 未编译（dist/main/autoRegister.js 不存在）')
     console.error('  2. 依赖未安装（playwright, imap, mailparser）')
-    console.error('  3. TypeScript 源码不存在（src/main/autoRegister.ts）')
+    console.error('  3. TypeScript 源码不存在（server/src/main/autoRegister.ts）')
     console.error('\n解决方法：')
     console.error('  npm install           # 安装所有依赖')
-    console.error('  npm run build         # 编译主项目')
-    console.error('  npm run server:build  # 编译服务器')
-    console.error('  npm run server:start  # 启动服务器')
+    console.error('  npm run build         # 编译 server')
+    console.error('  npm run start         # 启动 server')
     console.error('='.repeat(60) + '\n')
     throw error
   }
