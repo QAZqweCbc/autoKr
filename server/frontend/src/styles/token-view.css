@@ -124,6 +124,18 @@
   font-size: 15px;
 }
 
+.token-view :deep(.token-account-row) {
+  cursor: pointer;
+}
+
+.token-view :deep(.token-account-row:hover > td) {
+  background: #f4f8ff !important;
+}
+
+.token-view :deep(.token-account-row.is-selected > td) {
+  background: #eef5ff !important;
+}
+
 .notice-box ul {
   margin: 6px 0 0 18px;
   padding: 0;

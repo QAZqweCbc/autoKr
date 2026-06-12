@@ -93,11 +93,14 @@
 
       <el-table
         v-if="filteredTasks.length > 0"
+        ref="tableRef"
         :data="filteredTasks"
         stripe
         class="enhanced-table"
         style="width: 100%"
+        :row-class-name="getTaskRowClassName"
         @selection-change="handleSelectionChange"
+        @row-click="handleTaskRowClick"
       >
         <el-table-column type="selection" width="55" />
         
@@ -208,6 +211,7 @@ const websocketStore = useWebSocketStore()
 // 筛选
 const statusFilter = ref('')
 const selectedTasks = ref<Task[]>([])
+const tableRef = ref<any>(null)
 
 let unsubscribe: (() => void) | null = null
 
@@ -246,6 +250,19 @@ const handleFilterChange = () => {
 
 const handleSelectionChange = (selection: Task[]) => {
   selectedTasks.value = selection
+}
+
+const handleTaskRowClick = (row: Task, _column: unknown, event: MouseEvent) => {
+  const target = event.target as HTMLElement | null
+  if (target?.closest('button, a, input, textarea, label, .el-button, .el-checkbox, .el-select, .el-dropdown')) {
+    return
+  }
+
+  tableRef.value?.toggleRowSelection(row)
+}
+
+const getTaskRowClassName = ({ row }: { row: Task }) => {
+  return selectedTasks.value.some(task => task.id === row.id) ? 'task-row is-selected' : 'task-row'
 }
 
 const handleDelete = async (id: string) => {

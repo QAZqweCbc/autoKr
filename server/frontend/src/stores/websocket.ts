@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { io, Socket } from 'socket.io-client'
+import axios from 'axios'
 
 export type LogCategory = 'register' | 'config' | 'account' | 'connection'
 export type LogLevel = 'info' | 'success' | 'warning' | 'error'
@@ -44,12 +45,15 @@ export interface WsLogEntry {
   source: string
   /** 结构化载荷，用于账户日志的结构化展示 */
   payload?: AccountLogPayload
+  /** 后端日志记录的时间戳（用于排序） */
+  createdAt?: number
 }
 
 export const useWebSocketStore = defineStore('websocket', () => {
   const socket = ref<Socket | null>(null)
   const connected = ref(false)
   const logs = ref<WsLogEntry[]>([])
+  const isHydrated = ref(false) // 是否已从数据库加载过历史日志
 
   const categorizedLogs = computed(() => ({
     register: logs.value.filter(log => log.category === 'register'),
@@ -75,6 +79,42 @@ export const useWebSocketStore = defineStore('websocket', () => {
     )
   )
 
+  /**
+   * 从数据库加载历史日志
+   */
+  async function hydrateLogs() {
+    try {
+      const { data } = await axios.get('/api/system-logs/recent', {
+        params: { limit: 500 }
+      })
+      if (data?.success && Array.isArray(data.logs)) {
+        logs.value = data.logs
+          .map((log: any) => {
+            const createdAt = log.created_at || Date.now()
+            const date = new Date(createdAt)
+            const time = date.toLocaleTimeString('zh-CN', { hour12: false })
+            return {
+              id: log.id || `${createdAt}-${Math.random().toString(36).slice(2, 8)}`,
+              time,
+              message: log.message,
+              category: (log.category || 'register') as LogCategory,
+              level: (log.level || 'info') as LogLevel,
+              source: log.source || '数据库',
+              payload: log.payload ? (JSON.parse(log.payload) as AccountLogPayload) : undefined,
+              createdAt
+            }
+          })
+          // 按后端时间排序（数据库日志是倒序的，需要正序）
+          .sort((a: any, b: any) => (a.createdAt || 0) - (b.createdAt || 0))
+
+        isHydrated.value = true
+        console.log(`✅ 已加载 ${logs.value.length} 条历史日志`)
+      }
+    } catch (err: any) {
+      console.warn('加载历史日志失败（可能数据库尚未初始化）:', err?.message || err)
+    }
+  }
+
   const connect = () => {
     if (socket.value) return
 
@@ -88,6 +128,10 @@ export const useWebSocketStore = defineStore('websocket', () => {
 
     socket.value.on('connect', () => {
       connected.value = true
+      // 首次连接时从数据库加载历史日志
+      if (!isHydrated.value) {
+        hydrateLogs()
+      }
       addStructuredLog('connection', 'success', 'WebSocket 已连接', '连接状态')
     })
 
@@ -201,7 +245,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
   }
 
   const addDerivedLog = (rawMessage: string, source: string) => {
-    const normalized = rawMessage.replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '').trim()
+    const normalized = rawMessage.replace(/^[^一-龥A-Za-z0-9]+/, '').trim()
     addStructuredLog(detectCategory(normalized), detectLevel(normalized), normalized, source)
   }
 
@@ -249,6 +293,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     connect,
     disconnect,
     clearLogs,
+    hydrateLogs,
     onTaskUpdate,
     onAccountUpdate
   }

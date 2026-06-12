@@ -156,6 +156,18 @@
   flex-wrap: wrap;
 }
 
+.tasks-view :deep(.task-row) {
+  cursor: pointer;
+}
+
+.tasks-view :deep(.task-row:hover > td) {
+  background: #f4f8ff !important;
+}
+
+.tasks-view :deep(.task-row.is-selected > td) {
+  background: #eef5ff !important;
+}
+
 .email-cell {
   display: flex;
   align-items: center;

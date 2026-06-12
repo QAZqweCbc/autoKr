@@ -10,7 +10,7 @@
  *   - 授权码: QQ邮箱IMAP/SMTP授权码 (16位字符)
  */
 
-import { chromium, Browser, Page } from 'playwright'
+import { chromium, Browser, BrowserContext, Page } from 'playwright'
 import Imap from 'imap'
 import { simpleParser } from 'mailparser'
 import * as fs from 'fs'
@@ -21,11 +21,19 @@ type LogCallback = (message: string) => void
 
 // 调试HTML文件存放目录
 const DEBUG_HTML_DIR = path.resolve(__dirname, '../../logs/debug-html')
+const DEBUG_IMAGE_DIR = path.resolve(__dirname, '../../logs/debug-img')
+
+function sanitizeDebugName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g, '_').slice(0, 80)
+}
 
 // 初始化调试目录
 function ensureDebugDir() {
   if (!fs.existsSync(DEBUG_HTML_DIR)) {
     fs.mkdirSync(DEBUG_HTML_DIR, { recursive: true })
+  }
+  if (!fs.existsSync(DEBUG_IMAGE_DIR)) {
+    fs.mkdirSync(DEBUG_IMAGE_DIR, { recursive: true })
   }
 }
 
@@ -72,6 +80,70 @@ function saveDebugHtml(filename: string, content: string, log: LogCallback): str
   } catch (error) {
     log(`⚠ 保存调试 HTML 失败: ${error}`)
     return ''
+  }
+}
+
+async function saveDebugSnapshot(
+  page: Page,
+  description: string,
+  log: LogCallback,
+  reason: string,
+  selector?: string
+): Promise<void> {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const safeDescription = sanitizeDebugName(description)
+  const basename = `debug-${safeDescription}-${timestamp}`
+
+  try {
+    ensureDebugDir()
+
+    const screenshotPath = path.join(DEBUG_IMAGE_DIR, `${basename}.png`)
+    await page.screenshot({ path: screenshotPath, fullPage: true })
+    log(`📸 已保存全页截图: ${screenshotPath}`)
+  } catch (error) {
+    log(`⚠️ 保存全页截图失败: ${error}`)
+  }
+
+  try {
+    const html = await page.content()
+    saveDebugHtml(`${basename}.html`, html, log)
+  } catch (error) {
+    log(`⚠️ 保存页面 HTML 失败: ${error}`)
+  }
+
+  try {
+    const metadata: Record<string, unknown> = {
+      description,
+      reason,
+      selector,
+      url: page.url(),
+      title: await page.title().catch(() => ''),
+      viewport: page.viewportSize(),
+      savedAt: new Date().toISOString()
+    }
+
+    if (selector) {
+      const elementCount = await page.locator(selector).count().catch(() => 0)
+      metadata.elementCount = elementCount
+
+      if (elementCount > 0) {
+        const first = page.locator(selector).first()
+        metadata.targetVisible = await first.isVisible().catch(() => null)
+        metadata.targetEnabled = await first.isEnabled().catch(() => null)
+        metadata.targetBox = await first.boundingBox().catch(() => null)
+        metadata.targetHtml = await first.evaluate(el => el.outerHTML).catch(() => '')
+      }
+    }
+
+    metadata.bodyText = await page.locator('body').innerText({ timeout: 2000 })
+      .then(text => text.slice(0, 4000))
+      .catch(() => '')
+
+    const metadataPath = path.join(DEBUG_HTML_DIR, `${basename}.json`)
+    fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), 'utf-8')
+    log(`🧾 已保存页面诊断信息: ${metadataPath}`)
+  } catch (error) {
+    log(`⚠️ 保存页面诊断信息失败: ${error}`)
   }
 }
 
@@ -293,22 +365,23 @@ async function humanPageBehavior(
 /**
  * Canvas 指纹混淆 - 注入噪声
  */
-async function injectCanvasNoise(page: Page): Promise<void> {
-  await page.addInitScript(() => {
+async function injectCanvasNoise(page: Page, stableSeed?: number): Promise<void> {
+  await page.addInitScript((seed) => {
     // 保存原始方法
     const originalToDataURL = HTMLCanvasElement.prototype.toDataURL
     const originalToBlob = HTMLCanvasElement.prototype.toBlob
     const originalGetImageData = CanvasRenderingContext2D.prototype.getImageData
     
-    // 生成随机噪声种子（每次不同）
-    const noiseSeed = Math.random()
+    // 同一窗口画像使用稳定噪声，避免刷新后 Canvas 指纹抖动。
+    const noiseSeed = typeof seed === 'number' ? seed : Math.random()
     
     // 添加噪声函数
     function addNoise(imageData: ImageData): ImageData {
       const data = imageData.data
       for (let i = 0; i < data.length; i += 4) {
         // 10% 的像素添加微小噪声
-        if (Math.random() < 0.1) {
+        const pixelSeed = Math.abs(Math.sin(noiseSeed * 100000 + i)) % 1
+        if (pixelSeed < 0.1) {
           data[i] = data[i] ^ (noiseSeed > 0.5 ? 1 : 0)      // R
           data[i + 1] = data[i + 1] ^ (noiseSeed > 0.3 ? 1 : 0)  // G
           data[i + 2] = data[i + 2] ^ (noiseSeed > 0.7 ? 1 : 0)  // B
@@ -321,7 +394,7 @@ async function injectCanvasNoise(page: Page): Promise<void> {
     HTMLCanvasElement.prototype.toDataURL = function(type?: string, quality?: any): string {
       const ctx = this.getContext('2d')
       if (ctx) {
-        const imageData = ctx.getImageData(0, 0, this.width, this.height)
+        const imageData = originalGetImageData.call(ctx, 0, 0, this.width, this.height)
         addNoise(imageData)
         ctx.putImageData(imageData, 0, 0)
       }
@@ -332,7 +405,7 @@ async function injectCanvasNoise(page: Page): Promise<void> {
     HTMLCanvasElement.prototype.toBlob = function(callback: BlobCallback, type?: string, quality?: any): void {
       const ctx = this.getContext('2d')
       if (ctx) {
-        const imageData = ctx.getImageData(0, 0, this.width, this.height)
+        const imageData = originalGetImageData.call(ctx, 0, 0, this.width, this.height)
         addNoise(imageData)
         ctx.putImageData(imageData, 0, 0)
       }
@@ -344,7 +417,7 @@ async function injectCanvasNoise(page: Page): Promise<void> {
       const imageData = originalGetImageData.call(this, sx, sy, sw, sh, settings)
       return addNoise(imageData)
     }
-  })
+  }, stableSeed)
 }
 
 // HTML 转文本 - 改进版本
@@ -1228,21 +1301,13 @@ async function waitAndClickWithRetry(
       // 如果有错误，继续下一次尝试
       if (attempt < maxRetries - 1) {
         log(`⚠️ 点击${description}后出现错误，准备第 ${attempt + 2} 次尝试...`)
+        await saveDebugSnapshot(page, description, log, `点击后出现页面错误，第 ${attempt + 1} 次`, selector)
         await page.waitForTimeout(2000)
       }
 
     } catch (error) {
       log(`✗ 第 ${attempt + 1} 次点击${description}失败: ${error}`)
-
-      // 📸 失败时截图
-      try {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-        const screenshotPath = `debug-click-failed-${description.replace(/[^a-zA-Z0-9]/g, '_')}-${timestamp}.png`
-        await page.screenshot({ path: screenshotPath, fullPage: true })
-        log(`📸 已保存失败截图: ${screenshotPath}`)
-      } catch (screenshotError) {
-        log(`⚠️ 截图失败: ${screenshotError}`)
-      }
+      await saveDebugSnapshot(page, description, log, `点击异常，第 ${attempt + 1} 次: ${error}`, selector)
 
       // 📋 记录页面 HTML 结构
       try {
@@ -1545,6 +1610,19 @@ export async function autoRegisterAWS(
     showWindow: boolean
     delayMin?: number  // Minimum delay in seconds (default: 3)
     delayMax?: number  // Maximum delay in seconds (default: 8)
+    userDataDir?: string
+    windowProfile?: {
+      profileId: string
+      impersonate: string
+      userAgent: string
+      viewport: { width: number; height: number }
+      locale: string
+      timezoneId: string
+      extraHTTPHeaders: Record<string, string>
+      canvasNoiseSeed: number
+      userDataDir: string
+      proxyUrl?: string
+    }
   }
 ): Promise<{ 
   success: boolean
@@ -1558,6 +1636,7 @@ export async function autoRegisterAWS(
 }> {
   const randomName = generateRandomName()
   let browser: Browser | null = null
+  let context: BrowserContext | null = null
   
   // 提取延迟配置（如果提供）
   const configuredDelayMin = browserConfig?.delayMin
@@ -1594,6 +1673,9 @@ export async function autoRegisterAWS(
   }
   if (browserConfig) {
     log(`浏览器: ${browserConfig.browserType} ${browserConfig.headless ? '(无痕)' : ''} ${browserConfig.showWindow ? '(显示)' : '(隐藏)'}`)
+    if (browserConfig.windowProfile) {
+      log(`窗口画像: ${browserConfig.windowProfile.profileId} / ${browserConfig.windowProfile.impersonate}`)
+    }
   }
   
   try {
@@ -1669,17 +1751,39 @@ export async function autoRegisterAWS(
       log('使用 Playwright 内置浏览器')
     }
     
-    browser = await browserModule.launch(launchOptions)
-    
-    const context = await browser.newContext({
-      viewport: { width: 1280, height: 900 },
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    })
+    const profile = browserConfig?.windowProfile
+    const contextOptions = {
+      viewport: profile?.viewport || { width: 1280, height: 900 },
+      userAgent: profile?.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+      locale: profile?.locale || 'en-US',
+      timezoneId: profile?.timezoneId || 'America/New_York',
+      extraHTTPHeaders: profile?.extraHTTPHeaders || {
+        'accept-language': 'en-US,en;q=0.9',
+        'sec-ch-ua': '"Chromium";v="136", "Google Chrome";v="136", "Not.A/Brand";v="99"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"'
+      }
+    }
+
+    if (browserConfig?.userDataDir) {
+      fs.mkdirSync(browserConfig.userDataDir, { recursive: true })
+      log(`使用任务独立浏览器用户目录: ${browserConfig.userDataDir}`)
+      context = await (browserModule as any).launchPersistentContext(
+        browserConfig.userDataDir,
+        {
+          ...launchOptions,
+          ...contextOptions
+        }
+      )
+    } else {
+      browser = await browserModule.launch(launchOptions)
+      context = await browser.newContext(contextOptions)
+    }
     
     const page = await context.newPage()
     
     // 注入 Canvas 指纹混淆
-    await injectCanvasNoise(page)
+    await injectCanvasNoise(page, profile?.canvasNoiseSeed)
     log('✓ 已注入 Canvas 指纹混淆')
     
     // 步骤1.1: 动态获取 device code
@@ -2075,6 +2179,7 @@ export async function autoRegisterAWS(
       // 选择器: button[data-testid="signup-next-button"]
       const secondContinueSelector = 'button[data-testid="signup-next-button"]'
       if (!await waitAndClickWithRetry(page, secondContinueSelector, log, '第二个继续按钮')) {
+        await saveDebugSnapshot(page, '第二个继续按钮最终失败', log, '点击第二个继续按钮重试耗尽', secondContinueSelector)
         throw new Error('点击第二个继续按钮失败')
       }
       
@@ -2669,8 +2774,14 @@ export async function autoRegisterAWS(
     }
     
     // 关闭浏览器
-    await browser.close()
-    browser = null
+    if (context) {
+      await context.close()
+      context = null
+    }
+    if (browser) {
+      await browser.close()
+      browser = null
+    }
     
     log('\n========== 操作成功! ==========')
     return { 
@@ -2686,6 +2797,9 @@ export async function autoRegisterAWS(
     
   } catch (error) {
     log(`\n✗ 注册失败: ${error}`)
+    if (context) {
+      try { await context.close() } catch {}
+    }
     if (browser) {
       try { await browser.close() } catch {}
     }

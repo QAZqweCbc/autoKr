@@ -1,9 +1,9 @@
-<template>
+﻿<template>
   <div class="dashboard-view page-container">
     <!-- 页面标题 -->
     <div class="page-header">
       <h1 class="page-title">
-        <span class="title-icon">📊</span>
+        <span class="title-icon">DB</span>
         <span class="text-gradient">仪表盘</span>
       </h1>
       <p class="page-subtitle">系统概览与实时监控</p>
@@ -11,10 +11,10 @@
 
     <!-- 统计卡片 -->
     <div class="stats-grid">
-      <StatsCard title="总任务数" :value="stats.totalTasks" icon="📝" />
-      <StatsCard title="运行中" :value="stats.runningTasks" color="#3b82f6" icon="⚡" />
-      <StatsCard title="总账号数" :value="stats.totalAccounts" color="#10b981" icon="👥" />
-      <StatsCard title="活跃账号" :value="stats.activeAccounts" color="#f59e0b" icon="✨" />
+      <StatsCard title="总任务数" :value="stats.totalTasks" icon="T" />
+      <StatsCard title="运行中" :value="stats.runningTasks" color="#2563eb" icon="R" />
+      <StatsCard title="总账号数" :value="stats.totalAccounts" color="#047857" icon="A" />
+      <StatsCard title="活跃账号" :value="stats.activeAccounts" color="#b45309" icon="OK" />
     </div>
 
     <!-- 图表区域 - 上下布局 -->
@@ -22,7 +22,7 @@
     <el-card class="gradient-card chart-card" style="margin-top: 24px;">
       <template #header>
         <div class="card-header">
-          <span class="header-title">📧 邮箱域名分布</span>
+          <span class="header-title">邮箱域名分布</span>
           <el-tag v-if="domainStats.length > 0" type="info" size="small">
             {{ domainStats.length }} 个域名
           </el-tag>
@@ -38,7 +38,7 @@
         />
         <el-empty 
           v-else 
-          description="暂无数据,创建账号后将显示域名分布" 
+          description="暂无数据，创建账号后将显示域名分布" 
           :image-size="100"
         >
           <el-button type="primary" @click="router.push('/accounts')">
@@ -52,7 +52,7 @@
     <el-card class="gradient-card chart-card" style="margin-top: 24px;">
       <template #header>
         <div class="card-header">
-          <span class="header-title">📈 每日注册趋势（最近7天）</span>
+          <span class="header-title">每日注册趋势（最近7天）</span>
           <el-tag v-if="dailyStats.length > 0" type="success" size="small">
             {{ dailyStats.length }} 条记录
           </el-tag>
@@ -68,7 +68,7 @@
         />
         <el-empty 
           v-else 
-          description="暂无数据,创建账号后将显示注册趋势" 
+          description="暂无数据，创建账号后将显示注册趋势" 
           :image-size="100"
         >
           <el-button type="primary" @click="router.push('/accounts')">
@@ -93,7 +93,7 @@
           size="large"
           @click="router.push('/accounts')"
         >
-          <span class="btn-icon">🎲</span>
+          <span class="btn-icon">A</span>
           <span>生成账号</span>
         </el-button>
         <el-button
@@ -102,7 +102,7 @@
           size="large"
           @click="router.push('/tasks')"
         >
-          <span class="btn-icon">📝</span>
+          <span class="btn-icon">T</span>
           <span>创建任务</span>
         </el-button>
         <el-button
@@ -111,7 +111,7 @@
           size="large"
           @click="router.push('/check')"
         >
-          <span class="btn-icon">🛡️</span>
+          <span class="btn-icon">C</span>
           <span>基本检测</span>
         </el-button>
         <el-button
@@ -120,7 +120,7 @@
           size="large"
           @click="router.push('/token')"
         >
-          <span class="btn-icon">🔑</span>
+          <span class="btn-icon">K</span>
           <span>查看Token</span>
         </el-button>
       </div>
@@ -135,7 +135,7 @@
             <el-tag type="info" size="large">{{ recentTasks.length }} 条</el-tag>
           </div>
           <el-button type="primary" text @click="router.push('/tasks')">
-            查看全部 →
+            查看全部
           </el-button>
         </div>
       </template>
@@ -176,16 +176,16 @@
             <div class="status-item">
               <span class="status-label">WebSocket</span>
               <el-tag :type="wsConnected ? 'success' : 'danger'">
-                {{ wsConnected ? '✓ 已连接' : '✗ 断开' }}
+                {{ wsConnected ? '已连接' : '已断开' }}
               </el-tag>
             </div>
             <div class="status-item">
               <span class="status-label">数据库</span>
-              <el-tag type="success">✓ 正常</el-tag>
+              <el-tag type="success">正常</el-tag>
             </div>
             <div class="status-item">
               <span class="status-label">邮箱服务</span>
-              <el-tag type="success">✓ 正常</el-tag>
+              <el-tag type="success">正常</el-tag>
             </div>
           </div>
         </el-card>
@@ -198,19 +198,19 @@
           </template>
           <div class="quick-links">
             <router-link to="/email" class="quick-link">
-              <span class="link-icon">📧</span>
+              <span class="link-icon">M</span>
               <span>邮箱配置</span>
             </router-link>
             <router-link to="/browser" class="quick-link">
-              <span class="link-icon">🌐</span>
+              <span class="link-icon">B</span>
               <span>浏览器配置</span>
             </router-link>
             <router-link to="/config" class="quick-link">
-              <span class="link-icon">⚙️</span>
+              <span class="link-icon">D</span>
               <span>数据库配置</span>
             </router-link>
             <router-link to="/logs" class="quick-link">
-              <span class="link-icon">📊</span>
+              <span class="link-icon">L</span>
               <span>实时日志</span>
             </router-link>
           </div>
@@ -300,7 +300,7 @@ onMounted(async () => {
   await loadDomainStats()
   await loadDailyStats()
   
-  // 注册WebSocket监听器
+  // 注册 WebSocket 监听器
   unsubscribeTask = wsStore.onTaskUpdate(() => {
     scheduleRefresh()
   })
@@ -326,7 +326,7 @@ onMounted(async () => {
   // 监听窗口大小变化
   window.addEventListener('resize', handleResize)
 
-  // 清理函数
+  // 娓呯悊鍑芥暟
   onUnmounted(() => {
     observer.disconnect()
     window.removeEventListener('resize', handleResize)
@@ -346,18 +346,18 @@ onUnmounted(() => {
   }
 })
 
-// 域名分布饼图配置
+// 鍩熷悕鍒嗗竷楗煎浘閰嶇疆
 const domainChartOption = computed(() => {
   if (domainStats.value.length === 0) return null
   
-  // 精心挑选的渐变色方案
+  // 绮惧績鎸戦€夌殑娓愬彉鑹叉柟妗?
   const colors = [
-    { start: '#667eea', end: '#764ba2' },
-    { start: '#f093fb', end: '#f5576c' },
-    { start: '#4facfe', end: '#00f2fe' },
-    { start: '#43e97b', end: '#38f9d7' },
-    { start: '#fa709a', end: '#fee140' },
-    { start: '#30cfd0', end: '#330867' }
+    { start: '#2563eb', end: '#0891b2' },
+    { start: '#22c55e', end: '#047857' },
+    { start: '#0ea5e9', end: '#0369a1' },
+    { start: '#14b8a6', end: '#0f766e' },
+    { start: '#f59e0b', end: '#b45309' },
+    { start: '#64748b', end: '#334155' }
   ]
   
   return {
@@ -394,7 +394,7 @@ const domainChartOption = computed(() => {
     },
     series: [
       {
-        name: '域名分布',
+        name: '鍩熷悕鍒嗗竷',
         type: 'pie',
         radius: ['45%', '75%'],
         center: ['40%', '50%'],
@@ -459,7 +459,7 @@ const domainChartOption = computed(() => {
 
 // 每日注册趋势图配置
 const dailyChartOption = computed(() => {
-  // 生成最近7天的日期列表
+  // 鐢熸垚鏈€杩?澶╃殑鏃ユ湡鍒楄〃
   const generateLast7Days = () => {
     const dates = []
     const today = new Date()
@@ -473,12 +473,12 @@ const dailyChartOption = computed(() => {
   
   const allDates = generateLast7Days()
   
-  // 按日期分组
+  // 鎸夋棩鏈熷垎缁?
   const dateMap = new Map<string, Map<string, number>>()
   const domains = new Set<string>()
   
   dailyStats.value.forEach(item => {
-    const date = item.date?.split('T')[0] // 提取日期部分
+    const date = item.date?.split('T')[0] // 鎻愬彇鏃ユ湡閮ㄥ垎
     if (!date) return
     if (!dateMap.has(date)) {
       dateMap.set(date, new Map())
@@ -487,7 +487,7 @@ const dailyChartOption = computed(() => {
     domains.add(item.domain)
   })
   
-  // 构建系列数据
+  // 鏋勫缓绯诲垪鏁版嵁
   const series: any[] = []
   
   // 总计系列 - 面积图
@@ -506,8 +506,8 @@ const dailyChartOption = computed(() => {
         x2: 1,
         y2: 0,
         colorStops: [
-          { offset: 0, color: '#667eea' },
-          { offset: 1, color: '#764ba2' }
+          { offset: 0, color: '#2563eb' },
+          { offset: 1, color: '#0891b2' }
         ]
       }
     },
@@ -519,8 +519,8 @@ const dailyChartOption = computed(() => {
         x2: 0,
         y2: 1,
         colorStops: [
-          { offset: 0, color: 'rgba(102, 126, 234, 0.3)' },
-          { offset: 1, color: 'rgba(102, 126, 234, 0.05)' }
+          { offset: 0, color: 'rgba(37, 99, 235, 0.18)' },
+          { offset: 1, color: 'rgba(37, 99, 235, 0.04)' }
         ]
       }
     },
@@ -535,14 +535,14 @@ const dailyChartOption = computed(() => {
     })
   })
   
-  // 各域名系列 - 普通折线图（使用渐变色）
+  // 鍚勫煙鍚嶇郴鍒?- 鏅€氭姌绾垮浘锛堜娇鐢ㄦ笎鍙樿壊锛?
   const colorSchemes = [
     ['#10b981', '#059669'],
     ['#f59e0b', '#d97706'],
     ['#ef4444', '#dc2626'],
-    ['#8b5cf6', '#7c3aed'],
+    ['#06b6d4', '#0e7490'],
     ['#06b6d4', '#0891b2'],
-    ['#ec4899', '#db2777']
+    ['#94a3b8', '#475569']
   ]
   let colorIndex = 0
   
@@ -630,7 +630,7 @@ const dailyChartOption = computed(() => {
       boundaryGap: false,
       data: allDates.map(date => {
         if (!date) return ''
-        // 格式化日期为 MM-DD
+        // 鏍煎紡鍖栨棩鏈熶负 MM-DD
         const d = new Date(date)
         return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       }),
@@ -668,7 +668,7 @@ const dailyChartOption = computed(() => {
   }
 })
 
-// 防抖刷新函数
+// 闃叉姈鍒锋柊鍑芥暟
 const scheduleRefresh = () => {
   if (refreshTimer) {
     clearTimeout(refreshTimer)
@@ -678,7 +678,7 @@ const scheduleRefresh = () => {
     await loadRecentTasks()
     await loadDomainStats()
     await loadDailyStats()
-  }, 1000) // 1秒防抖
+  }, 1000) // 1绉掗槻鎶?
 }
 
 onMounted(async () => {
@@ -687,7 +687,7 @@ onMounted(async () => {
   await loadDomainStats()
   await loadDailyStats()
   
-  // 注册WebSocket监听器
+  // 注册 WebSocket 监听器
   unsubscribeTask = wsStore.onTaskUpdate(() => {
     scheduleRefresh()
   })
@@ -712,7 +712,7 @@ onUnmounted(() => {
 
 const loadStats = async () => {
   try {
-    // 加载任务统计
+    // 鍔犺浇浠诲姟缁熻
     const tasksRes = await fetch('/api/tasks/stats')
     const tasksData = await tasksRes.json()
     if (tasksData.success) {
@@ -720,7 +720,7 @@ const loadStats = async () => {
       stats.value.runningTasks = tasksData.stats.running || 0
     }
 
-    // 加载账号统计
+    // 鍔犺浇璐﹀彿缁熻
     const accountsRes = await fetch('/api/accounts')
     const accountsData = await accountsRes.json()
     if (accountsData.success) {
@@ -728,7 +728,7 @@ const loadStats = async () => {
       stats.value.activeAccounts = accountsData.accounts?.filter((a: any) => a.status === 'active').length || 0
     }
   } catch (error) {
-    console.error('加载统计失败:', error)
+    console.error('鍔犺浇缁熻澶辫触:', error)
   }
 }
 
@@ -740,7 +740,7 @@ const loadRecentTasks = async () => {
       recentTasks.value = (data.tasks || []).slice(0, 5)
     }
   } catch (error) {
-    console.error('加载最近任务失败:', error)
+    console.error('鍔犺浇鏈€杩戜换鍔″け璐?', error)
   }
 }
 
@@ -752,7 +752,7 @@ const loadDomainStats = async () => {
       domainStats.value = data.stats || []
     }
   } catch (error) {
-    console.error('加载域名统计失败:', error)
+    console.error('鍔犺浇鍩熷悕缁熻澶辫触:', error)
   }
 }
 
@@ -764,7 +764,7 @@ const loadDailyStats = async () => {
       dailyStats.value = data.stats || []
     }
   } catch (error) {
-    console.error('加载每日统计失败:', error)
+    console.error('鍔犺浇姣忔棩缁熻澶辫触:', error)
   }
 }
 
@@ -793,5 +793,6 @@ const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 </script>
+
 
 

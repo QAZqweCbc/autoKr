@@ -270,6 +270,11 @@ async function start() {
       logger.info('📦 初始化注册日志表...')
       const { createRegistrationLogTable } = await import('./services/registration-log.service')
       await createRegistrationLogTable()
+
+      // 初始化系统日志表
+      logger.info('📦 初始化系统日志表...')
+      const { createSystemLogTable } = await import('./services/system-log.service')
+      await createSystemLogTable()
     } else {
       logger.info('ℹ️  跳过数据库初始化（配置未完成）')
     }

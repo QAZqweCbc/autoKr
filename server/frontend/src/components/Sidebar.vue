@@ -2,7 +2,7 @@
   <aside class="sidebar" :class="{ collapsed }">
     <div class="sidebar-header">
       <div class="logo">
-        <span class="logo-icon">🚀</span>
+        <span class="logo-mark">K</span>
         <transition name="fade-slide">
           <span v-show="!collapsed" class="logo-text">Kiro Server</span>
         </transition>
@@ -17,7 +17,9 @@
         class="menu-item"
         :class="{ active: currentRoute === route.path }"
       >
-        <span class="menu-icon">{{ route.meta?.icon }}</span>
+        <el-icon class="menu-icon">
+          <component :is="getRouteIcon(route.name)" />
+        </el-icon>
         <transition name="fade-slide">
           <span v-show="!collapsed" class="menu-title">{{ route.meta?.title }}</span>
         </transition>
@@ -33,20 +35,41 @@
       </div>
     </div>
 
-    <el-button
-      :icon="collapsed ? ArrowRight : ArrowLeft"
-      circle
-      size="small"
-      class="toggle-button"
-      @click="toggleSidebar"
-    />
+    <el-tooltip :content="collapsed ? '展开侧边栏' : '收起侧边栏'" placement="right">
+      <button
+        type="button"
+        class="toggle-button"
+        :aria-label="collapsed ? '展开侧边栏' : '收起侧边栏'"
+        :title="collapsed ? '展开侧边栏' : '收起侧边栏'"
+        @click="toggleSidebar"
+      >
+        <el-icon>
+          <component :is="collapsed ? ArrowRight : ArrowLeft" />
+        </el-icon>
+      </button>
+    </el-tooltip>
   </aside>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
+import {
+  ArrowLeft,
+  ArrowRight,
+  DataAnalysis,
+  DataBoard,
+  Delete,
+  Document,
+  FolderChecked,
+  Key,
+  Lock,
+  Message,
+  Monitor,
+  Setting,
+  Tools,
+  User
+} from '@element-plus/icons-vue'
 import { useWebSocketStore } from '../stores/websocket'
 import { storeToRefs } from 'pinia'
 
@@ -72,6 +95,25 @@ const routes = computed(() => {
   })
 })
 
+const routeIcons: Record<string, any> = {
+  dashboard: DataBoard,
+  tasks: Document,
+  accounts: User,
+  check: FolderChecked,
+  token: Key,
+  email: Message,
+  browser: Monitor,
+  settings: Setting,
+  logs: DataAnalysis,
+  'deletion-logs': Delete,
+  'user-management': User,
+  'admin-login': Lock
+}
+
+const getRouteIcon = (name: unknown) => {
+  return routeIcons[String(name)] || Tools
+}
+
 const toggleSidebar = () => {
   collapsed.value = !collapsed.value
   document.body.classList.toggle('sidebar-collapsed', collapsed.value)
@@ -80,7 +122,7 @@ const toggleSidebar = () => {
 
 <style scoped>
 .sidebar {
-  width: 260px;
+  width: var(--sidebar-width);
   position: fixed;
   left: 0;
   top: 0;
@@ -88,57 +130,67 @@ const toggleSidebar = () => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #ffffff;
+  background: #fbfdff;
   color: var(--text-primary);
   border-right: 1px solid var(--border-color);
-  box-shadow: none;
+  box-shadow: 1px 0 0 rgba(15, 23, 42, 0.02);
   transition: width 0.28s ease;
 }
 
 .sidebar.collapsed {
-  width: 72px;
+  width: var(--sidebar-collapsed-width);
 }
 
 .sidebar-header {
-  padding: 18px 16px;
+  padding: 18px 16px 16px;
   border-bottom: 1px solid var(--border-color);
 }
 
 .logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   overflow: hidden;
 }
 
-.logo-icon {
-  font-size: 24px;
+.logo-mark {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
 }
 
 .logo-text {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   white-space: nowrap;
+  letter-spacing: 0;
 }
 
 .sidebar-menu {
   flex: 1;
-  padding: 12px 10px;
+  padding: 14px 10px;
   overflow-y: auto;
 }
 
 .menu-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 40px;
+  gap: 10px;
+  height: 42px;
   padding: 0 12px;
-  margin-bottom: 4px;
-  color: #475569;
+  margin-bottom: 3px;
+  color: var(--text-secondary);
   border-radius: var(--radius-md);
   text-decoration: none;
-  transition: background 0.16s ease, color 0.16s ease;
+  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .sidebar.collapsed .menu-item {
@@ -147,26 +199,30 @@ const toggleSidebar = () => {
 }
 
 .menu-item:hover {
-  background: #f1f5f9;
+  background: #eef4fb;
   color: var(--text-primary);
 }
 
 .menu-item.active {
-  background: var(--primary-soft);
+  background: #eaf2ff;
   color: var(--primary-dark);
   font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--primary-color);
 }
 
 .menu-icon {
-  width: 24px;
+  width: 22px;
+  height: 22px;
   display: inline-flex;
   justify-content: center;
-  font-size: 18px;
+  align-items: center;
+  font-size: 17px;
   flex-shrink: 0;
 }
 
 .menu-title {
   white-space: nowrap;
+  font-size: 14px;
 }
 
 .sidebar-footer {
@@ -178,10 +234,10 @@ const toggleSidebar = () => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 10px 11px;
   border-radius: var(--radius-md);
-  background: #f8fafc;
-  color: #475569;
+  background: #f1f6fb;
+  color: var(--text-secondary);
 }
 
 .sidebar.collapsed .server-status {
@@ -193,28 +249,64 @@ const toggleSidebar = () => {
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: #f87171;
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
 }
 
 .status-dot.connected {
-  background: #4ade80;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
 }
 
 .status-text {
   white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .toggle-button {
   position: fixed;
-  left: 244px;
-  top: 22px;
+  left: calc(var(--sidebar-width) + 13px);
+  top: 84px;
   z-index: 1001;
-  border: none !important;
-  box-shadow: var(--shadow-sm) !important;
+  width: 24px;
+  height: calc(100vh - 160px);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--text-secondary);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.09);
+  cursor: pointer;
+  transition:
+    left 0.28s ease,
+    transform 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.toggle-button:hover,
+.toggle-button:focus-visible {
+  color: var(--primary-color);
+  border-color: #bfdbfe;
+  background: #f8fbff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.16);
+  transform: translateX(2px);
+  outline: none;
+}
+
+.toggle-button :deep(.el-icon) {
+  font-size: 16px;
 }
 
 body.sidebar-collapsed .toggle-button {
-  left: 56px;
+  left: calc(var(--sidebar-collapsed-width) + 13px);
 }
 
 .fade-slide-enter-active,
@@ -226,5 +318,38 @@ body.sidebar-collapsed .toggle-button {
 .fade-slide-leave-to {
   opacity: 0;
   transform: translateX(-8px);
+}
+
+@media (max-width: 767px) {
+  .sidebar {
+    width: var(--sidebar-collapsed-width);
+  }
+
+  .sidebar:not(.collapsed) {
+    width: var(--sidebar-width);
+    box-shadow: var(--shadow-md);
+  }
+
+  .logo-text,
+  .menu-title,
+  .status-text {
+    display: none;
+  }
+
+  .sidebar:not(.collapsed) .logo-text,
+  .sidebar:not(.collapsed) .menu-title,
+  .sidebar:not(.collapsed) .status-text {
+    display: inline;
+  }
+
+  .toggle-button {
+    left: calc(var(--sidebar-collapsed-width) + 10px);
+    top: 20px;
+    height: calc(100vh - 40px);
+  }
+
+  .sidebar:not(.collapsed) .toggle-button {
+    left: calc(var(--sidebar-width) + 10px);
+  }
 }
 </style>

@@ -19,8 +19,8 @@
             >
               导出 Token ({{ selectedAccountIds.size }})
             </el-button>
-            <el-button type="primary" :icon="Refresh" :loading="refreshingAll" @click="handleRefreshAll">
-              批量刷新
+            <el-button type="primary" :icon="Refresh" :loading="refreshingAll" :disabled="selectedAccountIds.size === 0" @click="handleRefreshAll">
+              批量刷新额度 ({{ selectedAccountIds.size }})
             </el-button>
             <el-button :icon="Refresh" @click="loadTokens">刷新列表</el-button>
           </div>
@@ -222,7 +222,9 @@
         :data="accounts"
         stripe
         style="width: 100%;"
+        :row-class-name="getAccountRowClassName"
         @selection-change="handleSelectionChange"
+        @row-click="handleAccountRowClick"
       >
         <el-table-column type="selection" width="55" />
         <el-table-column prop="email" label="邮箱" min-width="180" />
@@ -495,42 +497,73 @@ const refreshAccountQuota = async (account: Account) => {
 }
 
 const handleRefreshAll = async () => {
-  const refreshableAccounts = accounts.value.filter(acc => canAutoRefresh(acc))
+  const selectedAccounts = accounts.value.filter(acc => selectedAccountIds.value.has(acc.id))
+  if (selectedAccounts.length === 0) {
+    ElMessage.warning('请先选择要刷新额度的账号')
+    return
+  }
+
+  const refreshableAccounts = selectedAccounts.filter(acc => canAutoRefresh(acc))
   if (refreshableAccounts.length === 0) {
-    ElMessage.warning('没有支持自动刷新的账号')
+    ElMessage.warning('选中的账号没有支持刷新额度的账号')
     return
   }
 
   try {
-    await ElMessageBox.confirm(`将刷新 ${refreshableAccounts.length} 个账号的 Token，是否继续？`, '批量刷新确认', {
+    await ElMessageBox.confirm(`将刷新选中的 ${refreshableAccounts.length} 个账号额度，未选中的账号不会处理，是否继续？`, '批量刷新额度确认', {
       type: 'warning',
-      confirmButtonText: '开始刷新',
+      confirmButtonText: '刷新额度',
       cancelButtonText: '取消'
     })
 
     refreshingAll.value = true
-    const response = await axios.post('/api/token/refresh-all')
+    const details: Array<{ email: string; success: boolean; error?: string }> = []
 
-    if (response.data.success) {
-      await loadTokens()
-      const { successCount, failedCount } = response.data
-      ElMessage.success(`刷新完成：成功 ${successCount} 个，失败 ${failedCount} 个（额度数据已同步）`)
+    for (const account of refreshableAccounts) {
+      try {
+        refreshingIds.value.add(account.id)
 
-      if (failedCount > 0 && response.data.details) {
-        const failedAccounts = response.data.details
-          .filter((d: any) => !d.success)
-          .map((d: any) => `${d.email}: ${d.error}`)
-          .join('\n')
+        const refreshResponse = await axios.post(`/api/token/${account.id}/refresh`)
+        if (!refreshResponse.data.success) {
+          throw new Error(refreshResponse.data.error || 'Token 刷新失败')
+        }
 
-        ElMessageBox.alert(failedAccounts, `刷新失败的账号 (${failedCount})`, {
+        const syncResponse = await axios.post(`/api/token/${account.id}/sync-usage`)
+        if (!syncResponse.data.success) {
+          throw new Error(syncResponse.data.error || '额度同步失败')
+        }
+
+        details.push({ email: account.email, success: true })
+      } catch (error: any) {
+        details.push({
+          email: account.email,
+          success: false,
+          error: error.response?.data?.error || error.message || '刷新额度失败'
+        })
+      } finally {
+        refreshingIds.value.delete(account.id)
+      }
+    }
+
+    await loadTokens()
+
+    const successCount = details.filter(item => item.success).length
+    const failedDetails = details.filter(item => !item.success)
+    ElMessage.success(`选中账号额度刷新完成：成功 ${successCount} 个，失败 ${failedDetails.length} 个`)
+
+    if (failedDetails.length > 0) {
+      ElMessageBox.alert(
+        failedDetails.map(item => `${item.email}: ${item.error}`).join('\n'),
+        `刷新额度失败的账号 (${failedDetails.length})`,
+        {
           type: 'warning',
           confirmButtonText: '知道了'
-        })
-      }
+        }
+      )
     }
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.error || error.message || '批量刷新失败')
+      ElMessage.error(error.response?.data?.error || error.message || '批量刷新额度失败')
     }
   } finally {
     refreshingAll.value = false
@@ -650,6 +683,19 @@ const formatDate = (dateStr: string | number | undefined) => {
 
 const handleSelectionChange = (selection: Account[]) => {
   selectedAccountIds.value = new Set(selection.map(acc => acc.id))
+}
+
+const handleAccountRowClick = (row: Account, _column: unknown, event: MouseEvent) => {
+  const target = event.target as HTMLElement | null
+  if (target?.closest('button, a, input, textarea, label, .el-button, .el-checkbox, .el-select, .el-dropdown')) {
+    return
+  }
+
+  tableRef.value?.toggleRowSelection(row)
+}
+
+const getAccountRowClassName = ({ row }: { row: Account }) => {
+  return selectedAccountIds.value.has(row.id) ? 'token-account-row is-selected' : 'token-account-row'
 }
 
 const selectAll = () => {

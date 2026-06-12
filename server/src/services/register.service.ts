@@ -12,6 +12,7 @@ import { loadBrowserConfig, applyLinuxOptimizations, getEnvironmentInfo } from '
 import { getEmailConfigForInternal } from './email-config-manager.service'
 import { syncAccountUsage } from './kiro-api.service'
 import { logRegistration } from './registration-log.service'
+import { buildWindowProfile, cleanupBrowserProfileDir } from './browser-profile.service'
 
 // 当前正在执行的任务数
 let runningTasks = 0
@@ -118,6 +119,18 @@ async function executeTask(task: Task) {
     
     // 🔧 应用 Linux 优化
     const optimizedConfig = applyLinuxOptimizations(browserConfig)
+    const windowProfile = buildWindowProfile({
+      taskId: task.id,
+      email: task.email,
+      windowName: 'current',
+      browserType: optimizedConfig.browserType,
+      proxyUrl: task.proxy_url
+    })
+    const taskBrowserConfig = {
+      ...optimizedConfig,
+      userDataDir: windowProfile.userDataDir,
+      windowProfile
+    }
 
     // 📝 记录浏览器配置详情
     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
@@ -131,6 +144,9 @@ async function executeTask(task: Task) {
     if (optimizedConfig.browserPath) {
       log(`📂 自定义路径: ${optimizedConfig.browserPath}`)
     }
+    log(`📁 浏览器用户目录: ${taskBrowserConfig.userDataDir}`)
+    log(`🧬 窗口画像: ${windowProfile.profileId} / ${windowProfile.impersonate}`)
+    log(`🕒 时区/语言: ${windowProfile.timezoneId} / ${windowProfile.locale}`)
 
     if (envInfo.isRoot && optimizedConfig.args.includes('--no-sandbox')) {
       log('✓ 已添加 root 用户安全参数')
@@ -190,7 +206,7 @@ async function executeTask(task: Task) {
       false, // skipOutlookActivation
       task.proxy_url,
       receiveEmail,
-      optimizedConfig  // 🔧 使用优化后的浏览器配置
+      taskBrowserConfig  // 🔧 使用优化后的浏览器配置和任务隔离目录
     )
     
     if (result.success) {
@@ -329,6 +345,18 @@ async function executeTask(task: Task) {
         name: result.name,
         ssoToken: result.ssoToken
       })
+
+      // 注册成功后清理任务独立浏览器用户目录，失败任务保留目录用于排查。
+      try {
+        const cleanupResult = await cleanupBrowserProfileDir(taskBrowserConfig.userDataDir)
+        if (cleanupResult.deleted) {
+          log('🧹 已清理浏览器用户目录')
+        } else if (cleanupResult.reason !== 'not_found') {
+          console.warn(`清理浏览器用户目录跳过: ${cleanupResult.reason || cleanupResult.error || '未知原因'}`)
+        }
+      } catch (cleanupError: any) {
+        console.warn(`清理浏览器用户目录失败: ${cleanupError?.message || cleanupError}`)
+      }
 
     } else {
       // 注册失败

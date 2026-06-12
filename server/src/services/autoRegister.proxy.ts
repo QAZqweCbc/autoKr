@@ -256,7 +256,27 @@ export type AutoRegisterAWSFunction = (
   skipOutlookActivation?: boolean,
   proxyUrl?: string,
   receiveEmail?: string,
-  browserConfig?: any
+  browserConfig?: {
+    browserType: 'chrome' | 'edge' | 'firefox' | 'brave' | 'opera'
+    browserPath: string
+    headless: boolean
+    showWindow: boolean
+    delayMin?: number
+    delayMax?: number
+    userDataDir?: string
+    windowProfile?: {
+      profileId: string
+      impersonate: string
+      userAgent: string
+      viewport: { width: number; height: number }
+      locale: string
+      timezoneId: string
+      extraHTTPHeaders: Record<string, string>
+      canvasNoiseSeed: number
+      userDataDir: string
+      proxyUrl?: string
+    }
+  }
 ) => Promise<{ 
   success: boolean
   ssoToken?: string
