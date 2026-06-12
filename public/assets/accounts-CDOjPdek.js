@@ -1,0 +1,1 @@
+import{a as s}from"./index-D5GkNzM3.js";const a=s.create({baseURL:"/api",timeout:3e4}),e=async()=>{const{data:t}=await a.get("/accounts");return t},n=async t=>{const{data:o}=await a.post("/accounts/export",{format:t},{responseType:"blob"});return o};export{n as e,e as g};

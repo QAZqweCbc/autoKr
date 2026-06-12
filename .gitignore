@@ -1,52 +1,55 @@
-# Dependencies
+# 依赖
 node_modules/
-server/node_modules/
-server/frontend/node_modules/
-
-# Build output
-out/
-dist/
-server/dist/
-server/frontend/dist/
-server/public/
-
-# Logs
 *.log
 npm-debug.log*
-logs/
-server/logs/
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Environment
+# 环境变量
 .env
 .env.local
 .env.*.local
-server/.env
-server/.db-init-state.json
-server/.setup-completed
 
-# OS
-.DS_Store
-Thumbs.db
+# 编译输出
+dist/
+build/
+*.tsbuildinfo
+
+# 数据文件
+data/
+*.db
+*.sqlite
+
+# 数据库初始化状态（多进程协调）
+.db-init-state.json
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-.kiro/
-server/.kiro/
-server/.claude/
-server/.codegraph/
-server/.superpowers/
-server/.vscode/
-server/frontend/.vscode/
-*.patch
-*.bak
+*~
 
-# Lock files (optional, 根据团队需求决定)
-# package-lock.json
+# 操作系统
+.DS_Store
+Thumbs.db
 
-backups/
-/docs/
-server/data/
-server/config/database.config.json
+# CodeGraph
+.codegraph/daemon.pid
+.codegraph/events
+
+# Superpowers (AI 工具临时文件)
+.superpowers/
+
+# 日志
+logs/
+*.log
+
+# 测试覆盖�?
+coverage/
+.nyc_output/
+
+# ���ݿ������ļ���������ƾ�ݣ�
+config/database.config.json
+

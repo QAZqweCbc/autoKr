@@ -1,7 +1,7 @@
 services:
   kiro:
     build:
-      context: ./server
+      context: .
       dockerfile: Dockerfile
     image: kiro-account-manager:local
     restart: unless-stopped
