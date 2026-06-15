@@ -143,14 +143,14 @@ const selectedCount = computed(() => props.selectedAccountIds.length)
 const exportFormat = ref<'aiclient2api' | 'json'>('aiclient2api')
 const selectedFields = ref<string[]>([
   'email',
-  'access_token',
-  'refresh_token',
-  'client_id',
-  'client_secret',
-  'region'
+  'credentials.accessToken',
+  'credentials.refreshToken',
+  'credentials.clientId',
+  'credentials.clientSecret',
+  'credentials.region'
 ])
 const onlyWithToken = ref(true)
-const includeExpired = ref(false)
+const includeExpired = ref(true)
 
 // 操作状态
 const copying = ref(false)
@@ -161,31 +161,50 @@ const fieldGroups = [
     title: '基础字段',
     fields: [
       { key: 'email', label: '邮箱' },
-      { key: 'password', label: '密码' },
       { key: 'status', label: '状态' },
       { key: 'nickname', label: '昵称' },
-      { key: 'user_id', label: '用户 ID' },
-      { key: 'region', label: '区域' }
+      { key: 'id', label: '账号 ID' },
+      { key: 'idp', label: '身份提供方' },
+      { key: 'userId', label: '用户 ID' },
+      { key: 'tags', label: '标签' },
+      { key: 'createdAt', label: '创建时间' },
+      { key: 'lastUsedAt', label: '最后使用时间' },
+      { key: 'lastCheckedAt', label: '最后检查时间' }
     ]
   },
   {
     title: 'Token 凭证',
     fields: [
-      { key: 'access_token', label: 'Access Token' },
-      { key: 'refresh_token', label: 'Refresh Token' },
-      { key: 'csrf_token', label: 'CSRF Token' },
-      { key: 'sso_token', label: 'SSO Token' },
-      { key: 'client_id', label: 'Client ID' },
-      { key: 'client_secret', label: 'Client Secret' },
-      { key: 'expires_at', label: '过期时间' }
+      { key: 'credentials.accessToken', label: 'Access Token' },
+      { key: 'credentials.refreshToken', label: 'Refresh Token' },
+      { key: 'credentials.csrfToken', label: 'CSRF Token' },
+      { key: 'credentials.ssoToken', label: 'SSO Token' },
+      { key: 'credentials.clientId', label: 'Client ID' },
+      { key: 'credentials.clientSecret', label: 'Client Secret' },
+      { key: 'credentials.region', label: '区域' },
+      { key: 'credentials.expiresAt', label: '过期时间' }
     ]
   },
   {
     title: '订阅与额度',
     fields: [
-      { key: 'subscription_type', label: '订阅类型' },
-      { key: 'usage_current', label: '当前用量' },
-      { key: 'usage_limit', label: '用量限制' }
+      { key: 'subscription.type', label: '订阅类型' },
+      { key: 'subscription.title', label: '订阅标题' },
+      { key: 'subscription.rawType', label: '原始订阅类型' },
+      { key: 'subscription.expiresAt', label: '订阅过期时间' },
+      { key: 'subscription.daysRemaining', label: '剩余天数' },
+      { key: 'subscription.managementTarget', label: '管理目标' },
+      { key: 'subscription.upgradeCapability', label: '升级能力' },
+      { key: 'subscription.overageCapability', label: '超额能力' },
+      { key: 'usage.current', label: '当前用量' },
+      { key: 'usage.limit', label: '用量限制' },
+      { key: 'usage.percentUsed', label: '使用百分比' },
+      { key: 'usage.lastUpdated', label: '用量更新时间' },
+      { key: 'usage.baseCurrent', label: '基础当前用量' },
+      { key: 'usage.baseLimit', label: '基础用量限制' },
+      { key: 'usage.freeTrialCurrent', label: '试用当前用量' },
+      { key: 'usage.freeTrialLimit', label: '试用用量限制' },
+      { key: 'usage.nextResetDate', label: '下次重置时间' }
     ]
   }
 ] as const
@@ -222,6 +241,37 @@ const getExportData = async (): Promise<string> => {
   return response.data
 }
 
+const copyToClipboard = async (text: string) => {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return
+    } catch {
+      // 浏览器可能拒绝 Clipboard API，继续使用兼容复制方案
+    }
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.style.position = 'fixed'
+  textarea.style.top = '-9999px'
+  textarea.style.left = '-9999px'
+  textarea.style.opacity = '0'
+  textarea.setAttribute('readonly', '')
+
+  document.body.appendChild(textarea)
+  textarea.focus()
+  textarea.select()
+  textarea.setSelectionRange(0, text.length)
+
+  const success = document.execCommand('copy')
+  document.body.removeChild(textarea)
+
+  if (!success) {
+    throw new Error('复制失败：浏览器拒绝写入剪贴板')
+  }
+}
+
 // 复制到剪贴板
 const handleCopy = async () => {
   if (selectedCount.value === 0) {
@@ -238,7 +288,7 @@ const handleCopy = async () => {
     copying.value = true
     const data = await getExportData()
 
-    await navigator.clipboard.writeText(data)
+    await copyToClipboard(data)
     ElMessage.success('已复制到剪贴板')
     handleClose()
   } catch (error: any) {
@@ -300,11 +350,11 @@ watch(exportFormat, (newFormat) => {
   if (newFormat === 'json' && selectedFields.value.length === 0) {
     selectedFields.value = [
       'email',
-      'access_token',
-      'refresh_token',
-      'client_id',
-      'client_secret',
-      'region'
+      'credentials.accessToken',
+      'credentials.refreshToken',
+      'credentials.clientId',
+      'credentials.clientSecret',
+      'credentials.region'
     ]
   }
 })
@@ -341,6 +391,10 @@ watch(exportFormat, (newFormat) => {
 .field-toolbar {
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.field-key {
+  overflow-wrap: anywhere;
 }
 
 .field-selection-card {

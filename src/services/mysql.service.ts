@@ -113,7 +113,7 @@ async function createTables() {
         auth_code VARCHAR(255) NOT NULL,
         client_id VARCHAR(255),
         proxy_url VARCHAR(255),
-        status ENUM('pending', 'running', 'success', 'failed') DEFAULT 'pending',
+        status ENUM('pending', 'running', 'success', 'failed', 'paused') DEFAULT 'pending',
         error TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -122,6 +122,8 @@ async function createTables() {
         INDEX idx_created_at (created_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `)
+
+    await ensureTaskStatusEnumSupportsPause(connection)
     
     // 创建账号表
     await connection.execute(`
@@ -241,6 +243,29 @@ async function createTables() {
   } finally {
     connection.release()
   }
+}
+
+/**
+ * 确保旧任务表支持 paused 状态。
+ */
+export async function ensureTaskStatusEnumSupportsPause(connection: mysql.PoolConnection) {
+  const [columns] = await connection.execute(
+    `SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'tasks'
+     AND COLUMN_NAME = 'status'`
+  )
+
+  const columnType = (columns as Array<{ COLUMN_TYPE?: string }>)[0]?.COLUMN_TYPE
+  if (typeof columnType === 'string' && columnType.toLowerCase().includes("'paused'")) {
+    return
+  }
+
+  await connection.execute(
+    `ALTER TABLE tasks
+     MODIFY COLUMN status ENUM('pending', 'running', 'success', 'failed', 'paused') DEFAULT 'pending'`
+  )
+  console.log('✅ 迁移字段: tasks.status 支持 paused')
 }
 
 /**

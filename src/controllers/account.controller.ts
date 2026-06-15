@@ -241,7 +241,7 @@ export async function exportTokens(req: Request, res: Response) {
       format = 'json',
       fields,
       onlyWithToken = true,
-      includeExpired = false
+      includeExpired = true
     } = req.body
 
     // 获取要导出的账号

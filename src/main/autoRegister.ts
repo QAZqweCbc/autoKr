@@ -15,33 +15,32 @@ import Imap from 'imap'
 import { simpleParser } from 'mailparser'
 import * as fs from 'fs'
 import * as path from 'path'
+import {
+  buildDebugArtifactPath,
+  createDebugArtifactBasename,
+  ensureDebugArtifactDirs,
+  getDebugHtmlDir
+} from '../utils/debug-artifacts'
+import {
+  AWS_TRANSIENT_ERROR_CLOSE_SELECTORS,
+  isAwsTransientRequestError,
+  summarizeAwsTransientRequestError
+} from '../utils/aws-registration-errors'
 
 // 日志回调类型
 type LogCallback = (message: string) => void
 
-// 调试HTML文件存放目录
-const DEBUG_HTML_DIR = path.resolve(__dirname, '../../logs/debug-html')
-const DEBUG_IMAGE_DIR = path.resolve(__dirname, '../../logs/debug-img')
-
-function sanitizeDebugName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g, '_').slice(0, 80)
-}
-
 // 初始化调试目录
 function ensureDebugDir() {
-  if (!fs.existsSync(DEBUG_HTML_DIR)) {
-    fs.mkdirSync(DEBUG_HTML_DIR, { recursive: true })
-  }
-  if (!fs.existsSync(DEBUG_IMAGE_DIR)) {
-    fs.mkdirSync(DEBUG_IMAGE_DIR, { recursive: true })
-  }
+  ensureDebugArtifactDirs()
 }
 
 // 清理旧的调试HTML文件（保留最近7天）
 function cleanupOldDebugFiles() {
   try {
     ensureDebugDir()
-    const files = fs.readdirSync(DEBUG_HTML_DIR)
+    const debugHtmlDir = getDebugHtmlDir()
+    const files = fs.readdirSync(debugHtmlDir)
     const now = Date.now()
     const maxAge = 7 * 24 * 60 * 60 * 1000 // 7天（毫秒）
 
@@ -49,7 +48,7 @@ function cleanupOldDebugFiles() {
     for (const file of files) {
       if (!file.endsWith('.html')) continue
 
-      const filePath = path.join(DEBUG_HTML_DIR, file)
+      const filePath = path.join(debugHtmlDir, file)
       const stats = fs.statSync(filePath)
       const age = now - stats.mtimeMs
 
@@ -73,7 +72,7 @@ function saveDebugHtml(filename: string, content: string, log: LogCallback): str
     ensureDebugDir()
     cleanupOldDebugFiles()
 
-    const filePath = path.join(DEBUG_HTML_DIR, filename)
+    const filePath = buildDebugArtifactPath(filename, 'html')
     fs.writeFileSync(filePath, content)
     log(`📄 已保存 HTML: ${filePath}`)
     return filePath
@@ -90,14 +89,12 @@ async function saveDebugSnapshot(
   reason: string,
   selector?: string
 ): Promise<void> {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-  const safeDescription = sanitizeDebugName(description)
-  const basename = `debug-${safeDescription}-${timestamp}`
+  const basename = createDebugArtifactBasename(description)
 
   try {
     ensureDebugDir()
 
-    const screenshotPath = path.join(DEBUG_IMAGE_DIR, `${basename}.png`)
+    const screenshotPath = buildDebugArtifactPath(`${basename}.png`, 'image')
     await page.screenshot({ path: screenshotPath, fullPage: true })
     log(`📸 已保存全页截图: ${screenshotPath}`)
   } catch (error) {
@@ -139,7 +136,7 @@ async function saveDebugSnapshot(
       .then(text => text.slice(0, 4000))
       .catch(() => '')
 
-    const metadataPath = path.join(DEBUG_HTML_DIR, `${basename}.json`)
+    const metadataPath = buildDebugArtifactPath(`${basename}.json`, 'metadata')
     fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), 'utf-8')
     log(`🧾 已保存页面诊断信息: ${metadataPath}`)
   } catch (error) {
@@ -173,6 +170,13 @@ const AWS_SENDERS = [
 // 随机姓名生成
 const FIRST_NAMES = ['James', 'Robert', 'John', 'Michael', 'David', 'William', 'Richard', 'Maria', 'Elizabeth', 'Jennifer', 'Linda', 'Barbara', 'Susan', 'Jessica']
 const LAST_NAMES = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez', 'Wilson', 'Anderson', 'Thomas', 'Taylor']
+const NAME_INPUT_SELECTORS = [
+  'input[placeholder="Maria José Silva"]',
+  'input[placeholder*="name" i]',
+  'input[aria-label*="name" i]',
+  'input[name*="name" i]',
+  'input[id*="name" i]'
+]
 
 function generateRandomName(): string {
   const first = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)]
@@ -1177,15 +1181,6 @@ async function checkAndRetryOnError(
   maxRetries: number = 3,
   retryDelay: number = 2000
 ): Promise<boolean> {
-  // 错误弹窗的多种可能选择器
-  // 通过页面文本内容检查错误信息（避免硬编码选择器）
-  const errorTexts = [
-    "Sorry, there was an error processing your request",
-    "error processing your request",
-    "Please try again",
-    "请重试"
-  ]
-
   for (let retry = 0; retry < maxRetries; retry++) {
     // 等待后重新检查页面状态
     await page.waitForTimeout(1500)
@@ -1195,9 +1190,9 @@ async function checkAndRetryOnError(
     try {
       const bodyText = await page.textContent('body')
       if (bodyText) {
-        hasError = errorTexts.some(errText => bodyText.includes(errText))
+        hasError = isAwsTransientRequestError(bodyText)
         if (hasError) {
-          log(`检测到错误: ${bodyText.substring(0, 100).trim()}...`)
+          log(`检测到错误: ${summarizeAwsTransientRequestError(bodyText)}`)
         }
       }
     } catch (e) {
@@ -1347,6 +1342,122 @@ async function waitAndClickWithRetry(
 
   log(`✗ ${description}经过 ${maxRetries} 次尝试后仍然失败`)
   return false
+}
+
+async function getAwsTransientRequestErrorSummary(page: Page): Promise<string | null> {
+  try {
+    const bodyText = await page.textContent('body')
+    if (isAwsTransientRequestError(bodyText)) {
+      return summarizeAwsTransientRequestError(bodyText)
+    }
+  } catch {
+    // 页面读取失败时交给后续 Playwright 操作报错。
+  }
+
+  return null
+}
+
+async function closeAwsTransientErrorBanner(page: Page, log: LogCallback): Promise<void> {
+  for (const selector of AWS_TRANSIENT_ERROR_CLOSE_SELECTORS) {
+    try {
+      const closeButton = page.locator(selector).first()
+      await closeButton.waitFor({ state: 'visible', timeout: 1500 })
+      await closeButton.click()
+      log('✓ 已关闭 AWS 错误提示')
+      return
+    } catch {
+      continue
+    }
+  }
+}
+
+async function waitForAnyVisibleSelector(
+  page: Page,
+  selectors: string[],
+  log: LogCallback,
+  description: string,
+  timeout: number = 30000
+): Promise<string | null> {
+  const perSelectorTimeout = Math.max(1000, Math.ceil(timeout / selectors.length))
+
+  for (const selector of selectors) {
+    try {
+      await page.locator(selector).first().waitFor({ state: 'visible', timeout: perSelectorTimeout })
+      log(`✓ 找到${description} (选择器: ${selector})`)
+      return selector
+    } catch {
+      continue
+    }
+  }
+
+  log(`✗ 未找到${description}`)
+  return null
+}
+
+async function submitRegistrationNameStep(
+  page: Page,
+  initialName: string,
+  log: LogCallback,
+  configuredDelayMin?: number,
+  configuredDelayMax?: number
+): Promise<string | null> {
+  const secondContinueSelector = 'button[data-testid="signup-next-button"]'
+  const maxAttempts = 3
+  let name = initialName
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await closeAwsTransientErrorBanner(page, log)
+
+    if (attempt > 0) {
+      name = generateRandomName()
+      log(`重试姓名步骤 (${attempt + 1}/${maxAttempts})，换用姓名: ${name}`)
+    }
+
+    const nameInputSelector = await waitForAnyVisibleSelector(page, NAME_INPUT_SELECTORS, log, '姓名输入框')
+    if (!nameInputSelector) {
+      await saveDebugSnapshot(page, '姓名输入框未出现', log, '等待姓名输入框超时')
+      return null
+    }
+
+    try {
+      const nameInput = page.locator(nameInputSelector).first()
+      await nameInput.click({ clickCount: 3 }).catch(() => undefined)
+      await nameInput.fill('').catch(() => undefined)
+    } catch {
+      // 清空失败时仍继续使用 humanType 输入，后续提交会暴露真实问题。
+    }
+
+    await humanType(page, nameInputSelector, name)
+    log(`✓ 已输入姓名: ${name}`)
+
+    await randomDelay(5, 10, log, '输入姓名后等待', configuredDelayMin, configuredDelayMax)
+
+    const clicked = await waitAndClickWithRetry(page, secondContinueSelector, log, '第二个继续按钮', 30000, 1)
+    const awsErrorSummary = await getAwsTransientRequestErrorSummary(page)
+
+    if (clicked && !awsErrorSummary) {
+      return name
+    }
+
+    if (!awsErrorSummary) {
+      return null
+    }
+
+    log(`⚠ ${awsErrorSummary}，准备恢复姓名步骤`)
+    await saveDebugSnapshot(page, '姓名步骤AWS临时错误', log, awsErrorSummary, secondContinueSelector)
+
+    if (attempt === maxAttempts - 1) {
+      log(`✗ 姓名步骤连续 ${maxAttempts} 次遇到 AWS 临时错误`)
+      return null
+    }
+
+    await closeAwsTransientErrorBanner(page, log)
+    const backoffMs = 8000 + attempt * 5000
+    log(`等待 ${(backoffMs / 1000).toFixed(0)} 秒后重试姓名步骤...`)
+    await page.waitForTimeout(backoffMs)
+  }
+
+  return null
 }
 
 /**
@@ -1634,7 +1745,7 @@ export async function autoRegisterAWS(
   clientId?: string
   clientSecret?: string
 }> {
-  const randomName = generateRandomName()
+  let randomName = generateRandomName()
   let browser: Browser | null = null
   let context: BrowserContext | null = null
   
@@ -1899,7 +2010,7 @@ export async function autoRegisterAWS(
       
       // 📸 截图保存（用于调试）
       try {
-        const screenshotPath = `debug-login-redirect-${Date.now()}.png`
+        const screenshotPath = buildDebugArtifactPath(`debug-login-redirect-${Date.now()}.png`, 'image')
         await page.screenshot({ path: screenshotPath, fullPage: true })
         log(`📸 已保存截图: ${screenshotPath}`)
       } catch (e) {
@@ -1996,8 +2107,9 @@ export async function autoRegisterAWS(
     
     if (!emailInputSelector) {
       // 保存调试信息
-      await page.screenshot({ path: `debug-no-input-${Date.now()}.png`, fullPage: true })
-      log(`📸 已保存调试截图`)
+      const screenshotPath = buildDebugArtifactPath(`debug-no-input-${Date.now()}.png`, 'image')
+      await page.screenshot({ path: screenshotPath, fullPage: true })
+      log(`📸 已保存调试截图: ${screenshotPath}`)
       throw new Error('未找到邮箱输入框，页面结构可能已变化')
     }
     
@@ -2167,21 +2279,20 @@ export async function autoRegisterAWS(
       // ========== 注册流程（新账号）==========
       // 步骤2: 等待姓名输入框出现，输入姓名
       log('\n步骤2: 输入姓名...')
-      await page.locator(nameInputSelector).first().waitFor({ state: 'visible', timeout: 30000 })
-      
-      // 使用人类输入方式
-      await humanType(page, nameInputSelector, randomName)
-      log(`✓ 已输入姓名: ${randomName}`)
-      
-      await randomDelay(5, 10, log, '输入姓名后等待', configuredDelayMin, configuredDelayMax)
-      
-      // 点击第二个继续按钮（带错误检测和自动重试）
-      // 选择器: button[data-testid="signup-next-button"]
-      const secondContinueSelector = 'button[data-testid="signup-next-button"]'
-      if (!await waitAndClickWithRetry(page, secondContinueSelector, log, '第二个继续按钮')) {
-        await saveDebugSnapshot(page, '第二个继续按钮最终失败', log, '点击第二个继续按钮重试耗尽', secondContinueSelector)
+      const submittedName = await submitRegistrationNameStep(
+        page,
+        randomName,
+        log,
+        configuredDelayMin,
+        configuredDelayMax
+      )
+
+      if (!submittedName) {
+        await saveDebugSnapshot(page, '姓名步骤最终失败', log, '姓名页提交重试耗尽')
         throw new Error('点击第二个继续按钮失败')
       }
+
+      randomName = submittedName
       
       await randomDelay(4, 7, log, '点击继续后等待验证码页面', configuredDelayMin, configuredDelayMax)
       
@@ -2240,7 +2351,7 @@ export async function autoRegisterAWS(
       
       if (!codeInputSelector) {
         // 截图保存当前页面状态用于调试
-        const screenshotPath = `debug-verification-${Date.now()}.png`
+        const screenshotPath = buildDebugArtifactPath(`debug-verification-${Date.now()}.png`, 'image')
         await page.screenshot({ path: screenshotPath, fullPage: true })
         log(`已保存调试截图: ${screenshotPath}`)
         
@@ -2437,7 +2548,7 @@ export async function autoRegisterAWS(
       
       // 保存页面截图用于调试
       try {
-        const screenshotPath = `debug-allow-access-${Date.now()}.png`
+        const screenshotPath = buildDebugArtifactPath(`debug-allow-access-${Date.now()}.png`, 'image')
         await page.screenshot({ path: screenshotPath, fullPage: true })
         log(`  📸 已保存截图: ${screenshotPath}`)
       } catch (e) {

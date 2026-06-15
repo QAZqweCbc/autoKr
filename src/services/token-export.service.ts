@@ -25,29 +25,10 @@ export interface AIClient2APIFormat {
 }
 
 /**
- * 导出字段选项
+ * 导出字段选项，key 使用账号对象的真实字段路径
  */
 export interface ExportFieldOptions {
-  email?: boolean
-  password?: boolean
-  access_token?: boolean
-  refresh_token?: boolean
-  csrf_token?: boolean
-  sso_token?: boolean
-  client_id?: boolean
-  client_secret?: boolean
-  region?: boolean
-  expires_at?: boolean
-  subscription_type?: boolean
-  subscription_title?: boolean
-  usage_current?: boolean
-  usage_limit?: boolean
-  usage_percent?: boolean
-  status?: boolean
-  nickname?: boolean
-  user_id?: boolean
-  created_at?: boolean
-  last_used_at?: boolean
+  [fieldPath: string]: boolean | undefined
 }
 
 /**
@@ -65,7 +46,7 @@ export interface TokenExportOptions {
  */
 export function exportAsAIClient2API(accounts: Account[]): AIClient2APIFormat[] {
   return accounts
-    .filter(acc => acc.credentials.accessToken) // 只导出有 token 的账号
+    .filter(acc => acc.credentials.accessToken)
     .map(acc => {
       const result: AIClient2APIFormat = {
         email: acc.email,
@@ -75,7 +56,6 @@ export function exportAsAIClient2API(accounts: Account[]): AIClient2APIFormat[] 
         auth_method: acc.credentials.authMethod || 'oauth'
       }
 
-      // 可选字段
       if (acc.password) result.password = acc.password
       if (acc.credentials.refreshToken) result.refresh_token = acc.credentials.refreshToken
       if (acc.credentials.csrfToken) result.csrf_token = acc.credentials.csrfToken
@@ -88,8 +68,31 @@ export function exportAsAIClient2API(accounts: Account[]): AIClient2APIFormat[] 
     })
 }
 
+const getValueByPath = (source: Record<string, any>, path: string): any => {
+  return path.split('.').reduce((value, key) => {
+    if (value === undefined || value === null) return undefined
+    return Object.prototype.hasOwnProperty.call(value, key) ? value[key] : undefined
+  }, source as any)
+}
+
+const setValueByPath = (target: Record<string, any>, path: string, value: any) => {
+  const keys = path.split('.')
+  const leafKey = keys.pop()
+
+  if (!leafKey) return
+
+  const parent = keys.reduce((current, key) => {
+    if (!current[key] || typeof current[key] !== 'object' || Array.isArray(current[key])) {
+      current[key] = {}
+    }
+    return current[key]
+  }, target)
+
+  parent[leafKey] = value
+}
+
 /**
- * 导出为 JSON 格式（自定义字段）
+ * 导出为 JSON 格式，字段名保持账号对象的真实字段路径
  */
 export function exportAsCustomJSON(
   accounts: Account[],
@@ -98,61 +101,14 @@ export function exportAsCustomJSON(
   return accounts.map(acc => {
     const result: Record<string, any> = {}
 
-    // 基础字段
-    if (fields.email !== false) result.email = acc.email
-    if (fields.password && acc.password) result.password = acc.password
-    if (fields.nickname && acc.nickname) result.nickname = acc.nickname
-    if (fields.status) result.status = acc.status
+    Object.entries(fields).forEach(([fieldPath, enabled]) => {
+      if (!enabled) return
 
-    // 凭证字段
-    if (fields.access_token && acc.credentials.accessToken) {
-      result.access_token = acc.credentials.accessToken
-    }
-    if (fields.refresh_token && acc.credentials.refreshToken) {
-      result.refresh_token = acc.credentials.refreshToken
-    }
-    if (fields.csrf_token && acc.credentials.csrfToken) {
-      result.csrf_token = acc.credentials.csrfToken
-    }
-    if (fields.sso_token && acc.credentials.ssoToken) {
-      result.sso_token = acc.credentials.ssoToken
-    }
-    if (fields.client_id && acc.credentials.clientId) {
-      result.client_id = acc.credentials.clientId
-    }
-    if (fields.client_secret && acc.credentials.clientSecret) {
-      result.client_secret = acc.credentials.clientSecret
-    }
-    if (fields.region) {
-      result.region = acc.credentials.region || 'us-east-1'
-    }
-    if (fields.expires_at && acc.credentials.expiresAt) {
-      result.expires_at = acc.credentials.expiresAt
-    }
-
-    // 订阅字段
-    if (fields.subscription_type && acc.subscription.type) {
-      result.subscription_type = acc.subscription.type
-    }
-    if (fields.subscription_title && acc.subscription.title) {
-      result.subscription_title = acc.subscription.title
-    }
-
-    // 使用量字段
-    if (fields.usage_current !== undefined && acc.usage.current !== undefined) {
-      result.usage_current = acc.usage.current
-    }
-    if (fields.usage_limit !== undefined && acc.usage.limit !== undefined) {
-      result.usage_limit = acc.usage.limit
-    }
-    if (fields.usage_percent !== undefined && acc.usage.percentUsed !== undefined) {
-      result.usage_percent = acc.usage.percentUsed
-    }
-
-    // 其他字段
-    if (fields.user_id && acc.userId) result.user_id = acc.userId
-    if (fields.created_at && acc.createdAt) result.created_at = acc.createdAt
-    if (fields.last_used_at && acc.lastUsedAt) result.last_used_at = acc.lastUsedAt
+      const value = getValueByPath(acc as Record<string, any>, fieldPath)
+      if (value !== undefined) {
+        setValueByPath(result, fieldPath, value)
+      }
+    })
 
     return result
   })
@@ -165,14 +121,13 @@ export function exportTokens(
   accounts: Account[],
   options: TokenExportOptions
 ): string {
-  // 过滤选项
   let filteredAccounts = accounts
 
   if (options.onlyWithToken) {
     filteredAccounts = filteredAccounts.filter(acc => acc.credentials.accessToken)
   }
 
-  if (!options.includeExpired) {
+  if (options.includeExpired === false) {
     const now = Date.now()
     filteredAccounts = filteredAccounts.filter(acc => {
       if (!acc.credentials.expiresAt) return true
@@ -180,22 +135,25 @@ export function exportTokens(
     })
   }
 
-  // 根据格式导出
+  if (filteredAccounts.length === 0) {
+    throw new Error('筛选后没有可导出的账号，请勾选“包含已过期的 Token”或取消过滤条件')
+  }
+
   if (options.format === 'aiclient2api') {
     const data = exportAsAIClient2API(filteredAccounts)
     return JSON.stringify(data, null, 2)
-  } else {
-    const fields = options.fields || {
-      email: true,
-      access_token: true,
-      refresh_token: true,
-      client_id: true,
-      client_secret: true,
-      region: true
-    }
-    const data = exportAsCustomJSON(filteredAccounts, fields)
-    return JSON.stringify(data, null, 2)
   }
+
+  const fields = options.fields || {
+    email: true,
+    'credentials.accessToken': true,
+    'credentials.refreshToken': true,
+    'credentials.clientId': true,
+    'credentials.clientSecret': true,
+    'credentials.region': true
+  }
+  const data = exportAsCustomJSON(filteredAccounts, fields)
+  return JSON.stringify(data, null, 2)
 }
 
 /**

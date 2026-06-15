@@ -1,13 +1,13 @@
 /**
- * autoRegister ´úÀíÄ£¿é
- * ÔËÐÐÊ±¶¯Ì¬¼ÓÔØ server ÄÚµÄ autoRegister£¬¼æÈÝÔ´ÂëºÍ±àÒë²úÎï
+ * autoRegister ä»£ç†æ¨¡å—
+ * è¿è¡Œæ—¶åŠ¨æ€åŠ è½½ server å†…çš„ autoRegisterï¼Œå…¼å®¹æºç å’Œç¼–è¯‘äº§ç‰©
  */
 
 import * as path from 'path'
 import * as fs from 'fs'
 import { createRequire } from 'module'
+import { buildDebugArtifactPath, ensureDebugArtifactDirs, getDebugImageDir } from '../utils/debug-artifacts'
 
-const DEBUG_IMAGE_DIR = path.resolve(__dirname, '../../logs/img')
 let screenshotPatchApplied = false
 
 function rewriteScreenshotOptions(options: any) {
@@ -19,10 +19,10 @@ function rewriteScreenshotOptions(options: any) {
     return options
   }
 
-  fs.mkdirSync(DEBUG_IMAGE_DIR, { recursive: true })
+  ensureDebugArtifactDirs()
   return {
     ...options,
-    path: path.join(DEBUG_IMAGE_DIR, path.basename(options.path))
+    path: buildDebugArtifactPath(options.path, 'image')
   }
 }
 
@@ -99,11 +99,11 @@ function patchPlaywrightScreenshotPath(autoRegisterPath: string) {
 
   let playwrightPath: string | null = null
 
-  // ÓÅÏÈ´Ó autoRegister ËùÔÚÄ¿Â¼ºÍ server Ä¿Â¼²éÕÒ playwright
+  // ä¼˜å…ˆä»Ž autoRegister æ‰€åœ¨ç›®å½•å’Œ server ç›®å½•æŸ¥æ‰¾ playwright
   const searchDirs = [
     path.dirname(autoRegisterPath),
-    path.resolve(__dirname, '../..'),  // server Ä¿Â¼
-    path.resolve(__dirname, '../../..') // ¼æÈÝ¾ÉÔËÐÐÎ»ÖÃ
+    path.resolve(__dirname, '../..'),  // server ç›®å½•
+    path.resolve(__dirname, '../../..') // å…¼å®¹æ—§è¿è¡Œä½ç½®
   ]
 
   for (const dir of searchDirs) {
@@ -111,13 +111,13 @@ function patchPlaywrightScreenshotPath(autoRegisterPath: string) {
       playwrightPath = require.resolve('playwright', { paths: [dir] })
       break
     } catch {
-      // ´ËÄ¿Â¼ÏÂÕÒ²»µ½£¬¼ÌÐø³¢ÊÔÏÂÒ»¸ö
+      // æ­¤ç›®å½•ä¸‹æ‰¾ä¸åˆ°ï¼Œç»§ç»­å°è¯•ä¸‹ä¸€ä¸ª
     }
   }
 
   if (!playwrightPath) {
-    // playwright ²»´æÔÚ£¬Ìø¹ý½ØÍ¼ patch£¨²»Ó°ÏìÆäËû¹¦ÄÜ£©
-    console.log('??  playwright Î´°²×°£¬Ìø¹ýµ÷ÊÔ½ØÍ¼ patch')
+    // playwright ä¸å­˜åœ¨ï¼Œè·³è¿‡æˆªå›¾ patchï¼ˆä¸å½±å“å…¶ä»–åŠŸèƒ½ï¼‰
+    console.log('âš  playwright æœªå®‰è£…ï¼Œè·³è¿‡è°ƒè¯•æˆªå›¾ patch')
     return
   }
 
@@ -128,7 +128,7 @@ function patchPlaywrightScreenshotPath(autoRegisterPath: string) {
   patchBrowserType(playwright.webkit)
 
   screenshotPatchApplied = true
-  console.log(`?? µ÷ÊÔ½ØÍ¼Ä¿Â¼: ${DEBUG_IMAGE_DIR}`)
+  console.log(`ðŸ“¸ è°ƒè¯•æˆªå›¾ç›®å½•: ${getDebugImageDir()}`)
 }
 
 function findServerDir(): string {
@@ -143,7 +143,7 @@ function findServerDir(): string {
           return currentDir
         }
       } catch {
-        // package.json ¶ÁÈ¡Ê§°ÜÊ±¼ÌÐøÏòÉÏ²éÕÒ
+        // package.json è¯»å–å¤±è´¥æ—¶ç»§ç»­å‘ä¸ŠæŸ¥æ‰¾
       }
     }
 
@@ -157,110 +157,108 @@ function findServerDir(): string {
   return path.resolve(__dirname, '../..')
 }
 
-// ÔËÐÐÊ±¶¯Ì¬µ¼Èë£¬±ÜÃâ TypeScript ±àÒëÊ±¼ì²é
+// è¿è¡Œæ—¶åŠ¨æ€å¯¼å…¥ï¼Œé¿å… TypeScript ç¼–è¯‘æ—¶æ£€æŸ¥
 export async function getAutoRegisterAWS() {
   const serverDir = findServerDir()
-  const playwrightDir = path.join(serverDir, 'node_modules')     // server/node_modules/
+  const playwrightDir = path.join(serverDir, 'node_modules')
 
-  // ÉèÖÃ NODE_PATH ÈÃ require/import ÄÜÕÒµ½ playwright
-  const originalNodePath = process.env.NODE_PATH
+  // è®¾ç½® NODE_PATH è®© require/import èƒ½æ‰¾åˆ° playwright
   if (!process.env.NODE_PATH || !process.env.NODE_PATH.split(path.delimiter).includes(playwrightDir)) {
-    if (process.env.NODE_PATH) {
-      process.env.NODE_PATH = process.env.NODE_PATH + path.delimiter + playwrightDir
-    } else {
-      process.env.NODE_PATH = playwrightDir
-    }
-    // ÖØÐÂ³õÊ¼»¯Ä£¿é½âÎöÂ·¾¶
-    (require as any).module?.Module?.initPaths()
+    process.env.NODE_PATH = process.env.NODE_PATH
+      ? process.env.NODE_PATH + path.delimiter + playwrightDir
+      : playwrightDir
+
+    // é‡æ–°åˆå§‹åŒ–æ¨¡å—è§£æžè·¯å¾„
+    ;(require as any).module?.Module?.initPaths()
   }
 
-  // ÓÅÏÈ¼ÓÔØ server ±àÒë²úÎï£¬¿ª·¢»·¾³ÏÂ»ØÍËµ½ TypeScript Ô´Âë
+  // ä¼˜å…ˆåŠ è½½ server ç¼–è¯‘äº§ç‰©ï¼Œå¼€å‘çŽ¯å¢ƒä¸‹å›žé€€åˆ° TypeScript æºç 
   let autoRegisterPath: string | null = null
   const compiledAutoRegisterPath = path.join(serverDir, 'dist/main/autoRegister.js')
   const sourceAutoRegisterPath = path.join(serverDir, 'src/main/autoRegister.ts')
 
   if (fs.existsSync(compiledAutoRegisterPath)) {
     autoRegisterPath = compiledAutoRegisterPath
-    console.log('?? ÕÒµ½ server ±àÒëºóµÄ autoRegister Ä£¿é')
+    console.log('æ‰¾åˆ° server ç¼–è¯‘åŽçš„ autoRegister æ¨¡å—')
   }
 
   if (!autoRegisterPath) {
-    console.log('??  Î´ÕÒµ½±àÒë°æ±¾£¬³¢ÊÔ¼ÓÔØ TypeScript Ô´Âë...')
+    console.log('æœªæ‰¾åˆ°ç¼–è¯‘ç‰ˆæœ¬ï¼Œå°è¯•åŠ è½½ TypeScript æºç ...')
     autoRegisterPath = sourceAutoRegisterPath
   }
 
   const serverRequire = createRequire(path.join(serverDir, 'package.json'))
   try {
-    console.log(`?? ¼ÓÔØÂ·¾¶: ${autoRegisterPath}`)
+    console.log(`åŠ è½½è·¯å¾„: ${autoRegisterPath}`)
     patchPlaywrightScreenshotPath(autoRegisterPath)
 
-    // Ê¹ÓÃ serverRequire ¶¯Ì¬¼ÓÔØ
+    // ä½¿ç”¨ serverRequire åŠ¨æ€åŠ è½½
     const autoRegisterModule = serverRequire(autoRegisterPath)
 
     if (!autoRegisterModule || !autoRegisterModule.autoRegisterAWS) {
-      throw new Error('autoRegisterAWS º¯ÊýÎ´ÕÒµ½')
+      throw new Error('autoRegisterAWS å‡½æ•°æœªæ‰¾åˆ°')
     }
 
     return autoRegisterModule.autoRegisterAWS
   } catch (error: any) {
-    // ÐÂÔö£ºÅÐ¶ÏÊÇ·ñÎª .ts ÎÄ¼þÎÞ·¨ require
-    if (autoRegisterPath.endsWith(".ts") && error.code === "MODULE_NOT_FOUND") {
-      console.error("\n" + "=".repeat(60))
-      console.error("ÎÞ·¨Ö±½Ó¼ÓÔØ TypeScript ÎÄ¼þ")
-      console.error("=".repeat(60))
-      console.error("ÇëÖ´ÐÐÒÔÏÂÃüÁî±àÒëÏîÄ¿ ºóÖØÊÔ£º")
-      console.error("  cd D:\\kiroAuto\\server")
-      console.error("  npm install && npm run build")
-      console.error("=".repeat(60) + "\n")
-      
+    // åˆ¤æ–­æ˜¯å¦ä¸º .ts æ–‡ä»¶æ— æ³• require
+    if (autoRegisterPath.endsWith('.ts') && error.code === 'MODULE_NOT_FOUND') {
+      console.error('\n' + '='.repeat(60))
+      console.error('æ— æ³•ç›´æŽ¥åŠ è½½ TypeScript æ–‡ä»¶')
+      console.error('='.repeat(60))
+      console.error('è¯·æ‰§è¡Œä»¥ä¸‹å‘½ä»¤ç¼–è¯‘é¡¹ç›®åŽé‡è¯•ï¼š')
+      console.error('  cd D:\\kiroAuto')
+      console.error('  npm install && npm run build')
+      console.error('='.repeat(60) + '\n')
+
       try {
-        require("ts-node/register")
-        console.log("ÒÑ×¢²á ts-node£¬ÖØÐÂ¼ÓÔØ...")
+        require('ts-node/register')
+        console.log('å·²æ³¨å†Œ ts-nodeï¼Œé‡æ–°åŠ è½½...')
         const mod2 = serverRequire(autoRegisterPath)
         if (mod2?.autoRegisterAWS) return mod2.autoRegisterAWS
       } catch (tsNodeError: any) {
-        console.error("ts-node Ò²Î´°²×°:", tsNodeError.message)
+        console.error('ts-node ä¹Ÿæœªå®‰è£…:', tsNodeError.message)
       }
-      
-      throw new Error("Çë±àÒëÏîÄ¿ºóÖØÊÔ: npm run build")
+
+      throw new Error('è¯·ç¼–è¯‘é¡¹ç›®åŽé‡è¯•: npm run build')
     }
-    
-    // ÅÐ¶ÏÊÇ·ñÎª playwright È±Ê§
+
+    // åˆ¤æ–­æ˜¯å¦ä¸º playwright ç¼ºå¤±
     const isPlaywrightMissing = error.code === 'MODULE_NOT_FOUND' &&
       (error.message.includes('playwright') || error.requireStack?.some((s: string) => s.includes('playwright')))
 
     if (isPlaywrightMissing) {
       console.error('\n' + '='.repeat(60))
-      console.error('? playwright Î´°²×°£¬ÎÞ·¨Ö´ÐÐ×Ô¶¯×¢²áÈÎÎñ')
+      console.error('playwright æœªå®‰è£…ï¼Œæ— æ³•æ‰§è¡Œè‡ªåŠ¨æ³¨å†Œä»»åŠ¡')
       console.error('='.repeat(60))
-      console.error('ÇëÔÚ·þÎñÆ÷ÉÏÖ´ÐÐÒÔÏÂÃüÁî°²×°£º')
-      console.error('  cd /root/×ÀÃæ/autoKr/server')
+      console.error('è¯·åœ¨æœåŠ¡å™¨ä¸Šæ‰§è¡Œä»¥ä¸‹å‘½ä»¤å®‰è£…ï¼š')
+      console.error('  cd /root/æ¡Œé¢/autoKr/server')
       console.error('  npm install')
       console.error('  npx playwright install chromium')
       console.error('='.repeat(60) + '\n')
-      throw new Error('playwright Î´°²×°£¬ÎÞ·¨Ö´ÐÐ×Ô¶¯×¢²áÈÎÎñ¡£ÇëÖ´ÐÐ: npm install && npx playwright install chromium')
+      throw new Error('playwright æœªå®‰è£…ï¼Œæ— æ³•æ‰§è¡Œè‡ªåŠ¨æ³¨å†Œä»»åŠ¡ã€‚è¯·æ‰§è¡Œ: npm install && npx playwright install chromium')
     }
 
     console.error('\n' + '='.repeat(60))
-    console.error('? ¼ÓÔØ autoRegister Ä£¿éÊ§°Ü')
+    console.error('åŠ è½½ autoRegister æ¨¡å—å¤±è´¥')
     console.error('='.repeat(60))
-    console.error(`´íÎó: ${error.message}`)
-    console.error(`³¢ÊÔ¼ÓÔØÂ·¾¶: ${autoRegisterPath}`)
-    console.error(`ÏîÄ¿Ä¿Â¼: ${serverDir}`)
-    console.error('\n¿ÉÄÜµÄÔ­Òò£º')
-    console.error('  1. ÏîÄ¿Î´±àÒë£¨dist/main/autoRegister.js ²»´æÔÚ£©')
-    console.error('  2. ÒÀÀµÎ´°²×°£¨playwright, imap, mailparser£©')
-    console.error('  3. TypeScript Ô´Âë²»´æÔÚ£¨src/main/autoRegister.ts£©')
-    console.error('\n½â¾ö·½·¨£º')
-    console.error('  npm install           # °²×°ËùÓÐÒÀÀµ')
-    console.error('  npm run build         # ±àÒëÏîÄ¿')
-    console.error('  npm run start         # Æô¶¯ÏîÄ¿')
+    console.error(`é”™è¯¯: ${error.message}`)
+    console.error(`å°è¯•åŠ è½½è·¯å¾„: ${autoRegisterPath}`)
+    console.error(`é¡¹ç›®ç›®å½•: ${serverDir}`)
+    console.error('\nå¯èƒ½çš„åŽŸå› ï¼š')
+    console.error('  1. é¡¹ç›®æœªç¼–è¯‘ï¼ˆdist/main/autoRegister.js ä¸å­˜åœ¨ï¼‰')
+    console.error('  2. ä¾èµ–æœªå®‰è£…ï¼ˆplaywright, imap, mailparserï¼‰')
+    console.error('  3. TypeScript æºç ä¸å­˜åœ¨ï¼ˆsrc/main/autoRegister.tsï¼‰')
+    console.error('\nè§£å†³æ–¹æ³•ï¼š')
+    console.error('  npm install           # å®‰è£…æ‰€æœ‰ä¾èµ–')
+    console.error('  npm run build         # ç¼–è¯‘é¡¹ç›®')
+    console.error('  npm run start         # å¯åŠ¨é¡¹ç›®')
     console.error('='.repeat(60) + '\n')
     throw error
   }
 }
 
-// µ¼³öÀàÐÍ£¨½öÓÃÓÚÀàÐÍ¼ì²é£¬²»»á±àÒëµ½ JS£©
+// å¯¼å‡ºç±»åž‹ï¼ˆä»…ç”¨äºŽç±»åž‹æ£€æŸ¥ï¼Œä¸ä¼šç¼–è¯‘åˆ° JSï¼‰
 export type AutoRegisterAWSFunction = (
   email: string,
   password: string,
@@ -292,7 +290,7 @@ export type AutoRegisterAWSFunction = (
       proxyUrl?: string
     }
   }
-) => Promise<{ 
+) => Promise<{
   success: boolean
   ssoToken?: string
   name?: string
